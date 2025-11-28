@@ -1,9 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import time
 from picamera import PiCamera
 
-import BaseHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 camera = PiCamera()
 camera.resolution = (640, 480)
@@ -18,7 +18,7 @@ HOST_NAME = "pi-noir-camera.local"
 PORT_NUMBER = 8000 # Magic number. Can't bind under 1024 on normal user accounts; port 80 is the normal HTTP port
 WEBCAM_FILENAME = "webcam.jpg"
 
-class SimpleCloudFileServer(BaseHTTPServer.BaseHTTPRequestHandler):
+class SimpleCloudFileServer(BaseHTTPRequestHandler):
 	def sendHeader(self, response=200, contentType="image/jpeg"):
 		self.send_response(response)
 		self.send_header("Content-type", contentType)
@@ -52,13 +52,13 @@ class SimpleCloudFileServer(BaseHTTPServer.BaseHTTPRequestHandler):
 		except:
 			printServerMessage("File not found: " + filename)
 			self.sendHeader(response=404, contentType="text/plain")
-			self.wfile.write("404 file not found")
+			self.wfile.write(b"404 file not found")
 
 def printServerMessage(customMessage):
-	print customMessage, "(Time: %s, Host: %s, port: %s)" % (time.asctime(), HOST_NAME, PORT_NUMBER)
+	print(customMessage, "(Time: %s, Host: %s, port: %s)" % (time.asctime(), HOST_NAME, PORT_NUMBER))
 	
 if __name__ == '__main__':
-	server_class = BaseHTTPServer.HTTPServer
+	server_class = HTTPServer
 	httpd = server_class((HOST_NAME, PORT_NUMBER), SimpleCloudFileServer)
 	
 	printServerMessage("Server startup")

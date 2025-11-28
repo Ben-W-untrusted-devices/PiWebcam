@@ -1,24 +1,29 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Pi NOIR Webcam</title>
+</head>
 <body>
-<canvas id="webcamElement" width="640" height="480"></canvas>
-<script>
-function refreshWebcamPixels() {
-	let webcamURL = "http://pi-noir-camera.local:8000/webcam.jpg?t=" + (new Date()).getTime();
-	
-	let webcamElement = document.getElementById("webcamElement");
-	let context = webcamElement.getContext("2d");
-	
-	let nextWebcamImage = new Image();
-	nextWebcamImage.onload = function() {
-		context.drawImage(nextWebcamImage, 0, 0);
-	}
-	nextWebcamImage.src = webcamURL;
-}
+	<canvas id="webcamElement" width="640" height="480"></canvas>
+	<script>
+		function refreshWebcamPixels() {
+			let webcamURL = "http://pi-noir-camera.local:8000/webcam.jpg?t=" + (new Date()).getTime();
 
-const interval = setInterval(function() {
-	refreshWebcamPixels()
-}, 1000/30);
+			let webcamElement = document.getElementById("webcamElement");
+			let context = webcamElement.getContext("2d");
 
-</script>
+			let nextWebcamImage = new Image();
+			nextWebcamImage.onload = function() {
+				context.drawImage(nextWebcamImage, 0, 0);
+			}
+			nextWebcamImage.src = webcamURL;
+		}
+
+		const interval = setInterval(function() {
+			refreshWebcamPixels()
+		}, 1000/30);
+	</script>
 </body>
 </html>
