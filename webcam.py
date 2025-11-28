@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import time
+import threading
 from picamera import PiCamera
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -16,7 +17,18 @@ time.sleep(2)
 # hosting
 HOST_NAME = "pi-noir-camera.local"
 PORT_NUMBER = 8000 # Magic number. Can't bind under 1024 on normal user accounts; port 80 is the normal HTTP port
-WEBCAM_FILENAME = "webcam.jpg"
+WEBCAM_FILENAME = "/tmp/webcam.jpg"  # Use RAM disk for fast I/O
+
+# Background capture thread
+def capture_loop():
+	"""Continuously capture frames from camera to file"""
+	while True:
+		try:
+			camera.capture(WEBCAM_FILENAME, use_video_port=True)
+			time.sleep(1.0 / 30)  # 30 fps
+		except Exception as e:
+			printServerMessage(f"Capture error: {e}")
+			time.sleep(1)
 
 class SimpleCloudFileServer(BaseHTTPRequestHandler):
 	def sendHeader(self, response=200, contentType="image/jpeg"):
@@ -41,9 +53,11 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 	
 	def do_GET(self):
 		filename = (self.path[1:]).split("?")[0]
-		
-		if (filename==WEBCAM_FILENAME):
-			camera.capture(WEBCAM_FILENAME)
+
+		# Handle webcam requests - just serve the continuously updated file
+		if filename == "webcam.jpg":
+			filename = WEBCAM_FILENAME
+
 		try:
 			with open(filename, "rb") as in_file:
 				data = in_file.read()
@@ -58,9 +72,15 @@ def printServerMessage(customMessage):
 	print(customMessage, "(Time: %s, Host: %s, port: %s)" % (time.asctime(), HOST_NAME, PORT_NUMBER))
 	
 if __name__ == '__main__':
+	# Start background capture thread
+	capture_thread = threading.Thread(target=capture_loop, daemon=True)
+	capture_thread.start()
+	printServerMessage("Camera capture thread started")
+
+	# Start HTTP server
 	server_class = HTTPServer
 	httpd = server_class((HOST_NAME, PORT_NUMBER), SimpleCloudFileServer)
-	
+
 	printServerMessage("Server startup")
 	try:
 		httpd.serve_forever()
