@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import io
 import time
 import threading
 from picamera import PiCamera
@@ -17,14 +18,25 @@ time.sleep(2)
 # hosting
 HOST_NAME = "pi-noir-camera.local"
 PORT_NUMBER = 8000 # Magic number. Can't bind under 1024 on normal user accounts; port 80 is the normal HTTP port
-WEBCAM_FILENAME = "/tmp/webcam.jpg"  # Use RAM disk for fast I/O
+
+# In-memory storage for current frame
+current_frame = None
+frame_lock = threading.Lock()
 
 # Background capture thread
 def capture_loop():
-	"""Continuously capture frames from camera to file"""
+	"""Continuously capture frames from camera to memory"""
+	global current_frame
 	while True:
 		try:
-			camera.capture(WEBCAM_FILENAME, use_video_port=True)
+			# Capture to in-memory buffer
+			stream = io.BytesIO()
+			camera.capture(stream, format='jpeg', use_video_port=True)
+
+			# Thread-safe update of current frame
+			with frame_lock:
+				current_frame = stream.getvalue()
+
 			time.sleep(1.0 / 30)  # 30 fps
 		except Exception as e:
 			printServerMessage(f"Capture error: {e}")
@@ -54,10 +66,18 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 	def do_GET(self):
 		filename = (self.path[1:]).split("?")[0]
 
-		# Handle webcam requests - just serve the continuously updated file
+		# Handle webcam requests - serve from memory
 		if filename == "webcam.jpg":
-			filename = WEBCAM_FILENAME
+			with frame_lock:
+				if current_frame is not None:
+					self.sendHeader(contentType="image/jpeg")
+					self.wfile.write(current_frame)
+				else:
+					self.sendHeader(response=503, contentType="text/plain")
+					self.wfile.write(b"Camera initializing, please wait")
+			return
 
+		# Handle other file requests (like webcam.html)
 		try:
 			with open(filename, "rb") as in_file:
 				data = in_file.read()
