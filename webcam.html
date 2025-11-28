@@ -4,12 +4,67 @@
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Pi NOIR Webcam</title>
+	<style>
+		body {
+			margin: 0;
+			padding: 20px;
+			background-color: black;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			min-height: 100vh;
+			font-family: Arial, sans-serif;
+		}
+
+		#webcamElement {
+			display: block;
+			margin-bottom: 20px;
+		}
+
+		#controls {
+			display: flex;
+			gap: 10px;
+		}
+
+		button {
+			padding: 10px 20px;
+			font-size: 16px;
+			cursor: pointer;
+			background-color: #333;
+			color: white;
+			border: 2px solid #555;
+			border-radius: 5px;
+			transition: background-color 0.2s;
+		}
+
+		button:hover {
+			background-color: #555;
+		}
+
+		button:active {
+			background-color: #666;
+		}
+	</style>
 </head>
 <body>
 	<canvas id="webcamElement" width="640" height="480"></canvas>
+	<div id="controls">
+		<button onclick="setRotation('N')">N (0°)</button>
+		<button onclick="setRotation('E')">E (90°)</button>
+		<button onclick="setRotation('S')">S (180°)</button>
+		<button onclick="setRotation('W')">W (270°)</button>
+	</div>
 	<script>
+		let currentRotation = 'N';
+
+		function setRotation(direction) {
+			currentRotation = direction;
+			console.log('Rotation set to:', direction);
+		}
+
 		function refreshWebcamPixels() {
-			let webcamURL = "http://pi-noir-camera.local:8000/webcam.jpg?t=" + (new Date()).getTime();
+			let webcamURL = "http://pi-noir-camera.local:8000/webcam.jpg?rotation=" + currentRotation + "&t=" + (new Date()).getTime();
 
 			let webcamElement = document.getElementById("webcamElement");
 			let context = webcamElement.getContext("2d");
