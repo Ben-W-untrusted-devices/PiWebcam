@@ -17,30 +17,43 @@
 			font-family: Arial, sans-serif;
 		}
 
+		#webcamContainer {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			margin-bottom: 20px;
+		}
+
 		#webcamElement {
 			display: block;
-			margin-bottom: 20px;
-			transition: transform 0.3s ease, margin-bottom 0.3s ease;
+			transition: transform 0.3s ease;
 		}
 
 		#webcamElement.rotate-n {
 			transform: rotate(0deg);
-			margin-bottom: 20px;
 		}
 
 		#webcamElement.rotate-e {
 			transform: rotate(90deg);
-			margin-bottom: 340px;  /* Extra space for portrait orientation */
 		}
 
 		#webcamElement.rotate-s {
 			transform: rotate(180deg);
-			margin-bottom: 20px;
 		}
 
 		#webcamElement.rotate-w {
 			transform: rotate(270deg);
-			margin-bottom: 340px;  /* Extra space for portrait orientation */
+		}
+
+		/* Reserve space for portrait rotations */
+		#webcamContainer.portrait {
+			width: 480px;  /* Canvas height becomes width when rotated */
+			height: 640px; /* Canvas width becomes height when rotated */
+		}
+
+		#webcamContainer.landscape {
+			width: 640px;
+			height: 480px;
 		}
 
 		#controls {
@@ -74,7 +87,9 @@
 	</style>
 </head>
 <body>
-	<canvas id="webcamElement" width="640" height="480"></canvas>
+	<div id="webcamContainer">
+		<canvas id="webcamElement" width="640" height="480"></canvas>
+	</div>
 	<div id="controls">
 		<button id="btn-n" onclick="setRotation('N')">N (0°)</button>
 		<button id="btn-e" onclick="setRotation('E')">E (90°)</button>
@@ -103,12 +118,21 @@
 
 		function applyRotation() {
 			const webcamElement = document.getElementById("webcamElement");
+			const webcamContainer = document.getElementById("webcamContainer");
 
 			// Remove all rotation classes
 			webcamElement.classList.remove('rotate-n', 'rotate-e', 'rotate-s', 'rotate-w');
+			webcamContainer.classList.remove('portrait', 'landscape');
 
 			// Add current rotation class
 			webcamElement.classList.add('rotate-' + currentRotation.toLowerCase());
+
+			// Set container size based on orientation
+			if (currentRotation === 'E' || currentRotation === 'W') {
+				webcamContainer.classList.add('portrait');
+			} else {
+				webcamContainer.classList.add('landscape');
+			}
 
 			// Update button states
 			document.querySelectorAll('#controls button').forEach(btn => btn.classList.remove('active'));
