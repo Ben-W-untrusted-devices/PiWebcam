@@ -20,23 +20,27 @@
 		#webcamElement {
 			display: block;
 			margin-bottom: 20px;
-			transition: transform 0.3s ease;
+			transition: transform 0.3s ease, margin-bottom 0.3s ease;
 		}
 
 		#webcamElement.rotate-n {
 			transform: rotate(0deg);
+			margin-bottom: 20px;
 		}
 
 		#webcamElement.rotate-e {
 			transform: rotate(90deg);
+			margin-bottom: 340px;  /* Extra space for portrait orientation */
 		}
 
 		#webcamElement.rotate-s {
 			transform: rotate(180deg);
+			margin-bottom: 20px;
 		}
 
 		#webcamElement.rotate-w {
 			transform: rotate(270deg);
+			margin-bottom: 340px;  /* Extra space for portrait orientation */
 		}
 
 		#controls {
