@@ -20,6 +20,23 @@
 		#webcamElement {
 			display: block;
 			margin-bottom: 20px;
+			transition: transform 0.3s ease;
+		}
+
+		#webcamElement.rotate-n {
+			transform: rotate(0deg);
+		}
+
+		#webcamElement.rotate-e {
+			transform: rotate(90deg);
+		}
+
+		#webcamElement.rotate-s {
+			transform: rotate(180deg);
+		}
+
+		#webcamElement.rotate-w {
+			transform: rotate(270deg);
 		}
 
 		#controls {
@@ -45,26 +62,57 @@
 		button:active {
 			background-color: #666;
 		}
+
+		button.active {
+			background-color: #666;
+			border-color: #888;
+		}
 	</style>
 </head>
 <body>
 	<canvas id="webcamElement" width="640" height="480"></canvas>
 	<div id="controls">
-		<button onclick="setRotation('N')">N (0°)</button>
-		<button onclick="setRotation('E')">E (90°)</button>
-		<button onclick="setRotation('S')">S (180°)</button>
-		<button onclick="setRotation('W')">W (270°)</button>
+		<button id="btn-n" onclick="setRotation('N')">N (0°)</button>
+		<button id="btn-e" onclick="setRotation('E')">E (90°)</button>
+		<button id="btn-s" onclick="setRotation('S')">S (180°)</button>
+		<button id="btn-w" onclick="setRotation('W')">W (270°)</button>
 	</div>
 	<script>
-		let currentRotation = 'N';
+		// Read rotation from URL parameter
+		const urlParams = new URLSearchParams(window.location.search);
+		let currentRotation = (urlParams.get('rotation') || 'N').toUpperCase();
+
+		// Validate rotation parameter
+		if (!['N', 'E', 'S', 'W'].includes(currentRotation)) {
+			currentRotation = 'N';
+		}
 
 		function setRotation(direction) {
+			// Update URL without reloading page
+			const newUrl = new URL(window.location);
+			newUrl.searchParams.set('rotation', direction);
+			window.history.pushState({}, '', newUrl);
+
 			currentRotation = direction;
-			console.log('Rotation set to:', direction);
+			applyRotation();
+		}
+
+		function applyRotation() {
+			const webcamElement = document.getElementById("webcamElement");
+
+			// Remove all rotation classes
+			webcamElement.classList.remove('rotate-n', 'rotate-e', 'rotate-s', 'rotate-w');
+
+			// Add current rotation class
+			webcamElement.classList.add('rotate-' + currentRotation.toLowerCase());
+
+			// Update button states
+			document.querySelectorAll('#controls button').forEach(btn => btn.classList.remove('active'));
+			document.getElementById('btn-' + currentRotation.toLowerCase()).classList.add('active');
 		}
 
 		function refreshWebcamPixels() {
-			let webcamURL = "http://pi-noir-camera.local:8000/webcam.jpg?rotation=" + currentRotation + "&t=" + (new Date()).getTime();
+			let webcamURL = "http://pi-noir-camera.local:8000/webcam.jpg?t=" + (new Date()).getTime();
 
 			let webcamElement = document.getElementById("webcamElement");
 			let context = webcamElement.getContext("2d");
@@ -75,6 +123,9 @@
 			}
 			nextWebcamImage.src = webcamURL;
 		}
+
+		// Apply initial rotation from URL
+		applyRotation();
 
 		const interval = setInterval(function() {
 			refreshWebcamPixels()

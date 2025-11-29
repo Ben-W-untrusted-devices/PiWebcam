@@ -3,7 +3,6 @@
 import io
 import time
 import threading
-from urllib.parse import parse_qs, urlparse
 from picamera import PiCamera
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -11,7 +10,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 camera = PiCamera()
 camera.resolution = (640, 480)
 camera.framerate = 30
-camera.rotation = 0  # Default rotation
 #camera.start_preview()
 
 #camera warm-up time
@@ -66,23 +64,10 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 		self.sendHeader()
 	
 	def do_GET(self):
-		# Parse URL and query parameters
-		parsed_url = urlparse(self.path)
-		filename = parsed_url.path[1:]  # Remove leading /
-		query_params = parse_qs(parsed_url.query)
+		filename = (self.path[1:]).split("?")[0]
 
 		# Handle webcam requests - serve from memory
 		if filename == "webcam.jpg":
-			# Handle rotation parameter
-			if 'rotation' in query_params:
-				rotation_param = query_params['rotation'][0].upper()
-				rotation_map = {'N': 0, 'E': 90, 'S': 180, 'W': 270}
-				if rotation_param in rotation_map:
-					new_rotation = rotation_map[rotation_param]
-					if camera.rotation != new_rotation:
-						camera.rotation = new_rotation
-						printServerMessage(f"Camera rotation set to {new_rotation} degrees")
-
 			with frame_lock:
 				if current_frame is not None:
 					self.sendHeader(contentType="image/jpeg")
