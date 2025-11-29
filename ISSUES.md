@@ -2,21 +2,16 @@
 
 ## Critical Priority
 
-### 1. Path Traversal Vulnerability (webcam.py:82)
+### ~~1. Path Traversal Vulnerability (webcam.py:82)~~ ✓ RESOLVED
 **Severity:** Critical - Security Issue
 
-**Location:** `webcam.py:82`
+**Status:** Fixed - Now validates all file paths are within current directory
 
-**Problem:**
-```python
-with open(filename, "rb") as in_file:
-```
-User-supplied path is opened directly without validation. An attacker could request `../../../etc/passwd` to read arbitrary files.
-
-**Solution:**
-- Validate filename doesn't contain `..` or `/`
-- Use allowlist of permitted files
-- Or restrict to current directory only
+**Solution Implemented:**
+- Added `os.path.abspath()` to resolve requested path
+- Validates resolved path starts with current directory
+- Returns 403 Forbidden for path traversal attempts
+- Also fixed bare exception handler to catch only `FileNotFoundError` and `IOError`
 
 ---
 
@@ -43,20 +38,15 @@ let webcamURL = "webcam.jpg?t=" + (new Date()).getTime();
 
 ## Medium Priority
 
-### 3. Bare Exception Handler (webcam.py:86)
+### ~~3. Bare Exception Handler (webcam.py:86)~~ ✓ RESOLVED
 **Severity:** Medium - Error Handling
 
-**Location:** `webcam.py:86`
+**Status:** Fixed as part of path traversal fix
 
-**Problem:**
+**Solution Implemented:**
+Now uses specific exception handling:
 ```python
-except:
-```
-Catches all exceptions including KeyboardInterrupt and SystemExit.
-
-**Solution:**
-```python
-except (FileNotFoundError, IOError) as e:
+except (FileNotFoundError, IOError):
 ```
 
 ---

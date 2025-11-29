@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import io
+import os
 import time
 import threading
 from picamera import PiCamera
@@ -79,11 +80,23 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 
 		# Handle other file requests (like webcam.html)
 		try:
-			with open(filename, "rb") as in_file:
+			# Security: Prevent path traversal attacks
+			# Get absolute path and ensure it's within current directory
+			current_dir = os.path.abspath(os.getcwd())
+			requested_path = os.path.abspath(filename)
+
+			# Reject if path tries to escape current directory
+			if not requested_path.startswith(current_dir):
+				printServerMessage(f"Path traversal attempt blocked: {filename}")
+				self.sendHeader(response=403, contentType="text/plain")
+				self.wfile.write(b"403 Forbidden")
+				return
+
+			with open(requested_path, "rb") as in_file:
 				data = in_file.read()
 				self.sendHeader(contentType=self.contentTypeFrom(filename))
 				self.wfile.write(data)
-		except:
+		except (FileNotFoundError, IOError):
 			printServerMessage("File not found: " + filename)
 			self.sendHeader(response=404, contentType="text/plain")
 			self.wfile.write(b"404 file not found")
