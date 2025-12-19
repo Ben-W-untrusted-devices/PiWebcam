@@ -359,6 +359,8 @@ Examples:
   %(prog)s --resolution 1280x720    # HD resolution
   %(prog)s --framerate 15           # Lower framerate
   %(prog)s --no-auth                # Disable authentication
+  %(prog)s --motion-detect          # Enable motion detection
+  %(prog)s --motion-detect --motion-threshold 3  # Sensitive detection
 		'''
 	)
 
@@ -375,6 +377,14 @@ Examples:
 	parser.add_argument('--log-level', default='INFO',
 		choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
 		help='Logging level (default: INFO)')
+
+	# Motion detection arguments
+	parser.add_argument('--motion-detect', action='store_true',
+		help='Enable motion detection (default: disabled)')
+	parser.add_argument('--motion-threshold', type=float, default=5.0,
+		help='Motion detection threshold percentage 0-100 (default: 5.0)')
+	parser.add_argument('--motion-cooldown', type=float, default=5.0,
+		help='Seconds between motion events (default: 5.0)')
 
 	return parser.parse_args()
 
@@ -399,7 +409,7 @@ def initialize_camera(resolution_str, framerate):
 
 def main():
 	"""Main entry point"""
-	global HOST_NAME, PORT_NUMBER, AUTH_USER, AUTH_PASS, AUTH_ENABLED
+	global HOST_NAME, PORT_NUMBER, AUTH_USER, AUTH_PASS, AUTH_ENABLED, motion_detector
 
 	# Parse command-line arguments
 	args = parse_args()
@@ -423,6 +433,21 @@ def main():
 		logger.info(f"Authentication enabled for user: {AUTH_USER}")
 	else:
 		logger.info("Authentication disabled")
+
+	# Initialize motion detection if enabled
+	if args.motion_detect:
+		# Validate threshold range
+		if not 0 <= args.motion_threshold <= 100:
+			logger.error(f"Motion threshold must be between 0 and 100, got {args.motion_threshold}")
+			sys.exit(1)
+
+		motion_detector = MotionDetector(
+			threshold=args.motion_threshold,
+			cooldown_seconds=args.motion_cooldown
+		)
+		logger.info(f"Motion detection enabled: threshold={args.motion_threshold}%, cooldown={args.motion_cooldown}s")
+	else:
+		logger.info("Motion detection disabled")
 
 	# Initialize camera
 	initialize_camera(args.resolution, args.framerate)
