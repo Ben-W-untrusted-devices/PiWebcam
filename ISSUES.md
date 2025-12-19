@@ -1,20 +1,5 @@
 # PiWebcam Issues & Improvements
 
-## Critical Priority
-
-### ~~1. Path Traversal Vulnerability (webcam.py:82)~~ ✓ RESOLVED
-**Severity:** Critical - Security Issue
-
-**Status:** Fixed - Now validates all file paths are within current directory
-
-**Solution Implemented:**
-- Added `os.path.abspath()` to resolve requested path
-- Validates resolved path starts with current directory
-- Returns 403 Forbidden for path traversal attempts
-- Also fixed bare exception handler to catch only `FileNotFoundError` and `IOError`
-
----
-
 ## High Priority
 
 ### 2. Hardcoded URL in Frontend (webcam.html:143)
@@ -38,20 +23,7 @@ let webcamURL = "webcam.jpg?t=" + (new Date()).getTime();
 
 ## Medium Priority
 
-### ~~3. Bare Exception Handler (webcam.py:86)~~ ✓ RESOLVED
-**Severity:** Medium - Error Handling
-
-**Status:** Fixed as part of path traversal fix
-
-**Solution Implemented:**
-Now uses specific exception handling:
-```python
-except (FileNotFoundError, IOError):
-```
-
----
-
-### 4. Missing Content-Type Default (webcam.py:51-61)
+### 3. Missing Content-Type Default (webcam.py:51-61)
 **Severity:** Medium - Error Handling
 
 **Location:** `webcam.py:51-61`
@@ -67,7 +39,7 @@ return "application/octet-stream"
 
 ---
 
-### 5. No Error Handling for Image Loading (webcam.html:148-152)
+### 4. No Error Handling for Image Loading (webcam.html:148-152)
 **Severity:** Medium - User Experience
 
 **Location:** `webcam.html:148-152`
@@ -80,7 +52,7 @@ Add `onerror` handler to retry or display error status.
 
 ---
 
-### 6. Magic Numbers - Frame Rate Duplication (webcam.py:40)
+### 5. Magic Numbers - Frame Rate Duplication (webcam.py:40)
 **Severity:** Medium - Code Quality
 
 **Location:** `webcam.py:40`
@@ -100,7 +72,7 @@ time.sleep(1.0 / camera.framerate)
 
 ## Low Priority
 
-### 7. No Graceful Camera Shutdown (webcam.py:96+)
+### 6. No Graceful Camera Shutdown (webcam.py:96+)
 **Severity:** Low - Resource Management
 
 **Location:** `webcam.py:96+`
@@ -122,7 +94,7 @@ finally:
 
 ---
 
-### 8. Hardcoded Hostname in Python (webcam.py:19)
+### 7. Hardcoded Hostname in Python (webcam.py:19)
 **Severity:** Low - Portability
 
 **Location:** `webcam.py:19`
@@ -138,7 +110,7 @@ Use `"0.0.0.0"` or make configurable via environment variable.
 
 ---
 
-### 9. No Loading State in UI (webcam.html)
+### 8. No Loading State in UI (webcam.html)
 **Severity:** Low - User Experience
 
 **Location:** `webcam.html`
@@ -151,7 +123,7 @@ Add loading indicator and connection status display.
 
 ---
 
-### 10. Unchecked Interval Timer (webcam.html:158)
+### 9. Unchecked Interval Timer (webcam.html:158)
 **Severity:** Low - Performance
 
 **Location:** `webcam.html:158`
@@ -164,7 +136,7 @@ Only schedule next refresh after current image loads successfully.
 
 ---
 
-### 11. Accessibility Issues (webcam.html)
+### 10. Accessibility Issues (webcam.html)
 **Severity:** Low - Accessibility
 
 **Location:** `webcam.html`

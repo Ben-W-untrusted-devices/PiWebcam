@@ -1,0 +1,5 @@
+# Testing dependencies for PiWebcam
+# Install with: pip3 install -r requirements-test.txt
+
+pytest>=7.0.0
+pytest-cov>=4.0.0
