@@ -88,7 +88,8 @@
 </head>
 <body>
 	<div id="webcamContainer">
-		<canvas id="webcamElement" width="640" height="480"></canvas>
+		<canvas id="webcamElement" width="640" height="480" role="img" aria-label="Live webcam feed"></canvas>
+		<div id="status" style="color: white; margin-top: 10px; font-size: 14px;" role="status" aria-live="polite">Connecting...</div>
 	</div>
 	<div id="controls">
 		<button id="btn-n" onclick="setRotation('N')">N (0°)</button>
@@ -135,12 +136,17 @@
 			}
 
 			// Update button states
-			document.querySelectorAll('#controls button').forEach(btn => btn.classList.remove('active'));
-			document.getElementById('btn-' + currentRotation.toLowerCase()).classList.add('active');
+			document.querySelectorAll('#controls button').forEach(btn => {
+				btn.classList.remove('active');
+				btn.setAttribute('aria-pressed', 'false');
+			});
+			const activeBtn = document.getElementById('btn-' + currentRotation.toLowerCase());
+			activeBtn.classList.add('active');
+			activeBtn.setAttribute('aria-pressed', 'true');
 		}
 
 		function refreshWebcamPixels() {
-			let webcamURL = "http://pi-noir-camera.local:8000/webcam.jpg?t=" + (new Date()).getTime();
+			let webcamURL = "webcam.jpg?t=" + (new Date()).getTime();
 
 			let webcamElement = document.getElementById("webcamElement");
 			let context = webcamElement.getContext("2d");
@@ -148,6 +154,15 @@
 			let nextWebcamImage = new Image();
 			nextWebcamImage.onload = function() {
 				context.drawImage(nextWebcamImage, 0, 0);
+				document.getElementById('status').textContent = 'Connected';
+				document.getElementById('status').style.color = '#4CAF50';
+				setTimeout(refreshWebcamPixels, 1000/30);
+			}
+			nextWebcamImage.onerror = function() {
+				console.error("Failed to load webcam image, retrying...");
+				document.getElementById('status').textContent = 'Connection lost, retrying...';
+				document.getElementById('status').style.color = '#ff9800';
+				setTimeout(refreshWebcamPixels, 1000);
 			}
 			nextWebcamImage.src = webcamURL;
 		}
@@ -155,9 +170,8 @@
 		// Apply initial rotation from URL
 		applyRotation();
 
-		const interval = setInterval(function() {
-			refreshWebcamPixels()
-		}, 1000/30);
+		// Start the refresh cycle
+		refreshWebcamPixels();
 	</script>
 </body>
 </html>

@@ -17,7 +17,7 @@ camera.framerate = 30
 time.sleep(2)
 
 # hosting
-HOST_NAME = "pi-noir-camera.local"
+HOST_NAME = "0.0.0.0"  # Bind to all interfaces for better portability
 PORT_NUMBER = 8000 # Magic number. Can't bind under 1024 on normal user accounts; port 80 is the normal HTTP port
 
 # In-memory storage for current frame
@@ -38,7 +38,7 @@ def capture_loop():
 			with frame_lock:
 				current_frame = stream.getvalue()
 
-			time.sleep(1.0 / 30)  # 30 fps
+			time.sleep(1.0 / camera.framerate)
 		except Exception as e:
 			printServerMessage(f"Capture error: {e}")
 			time.sleep(1)
@@ -60,6 +60,7 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 			return "image/png"
 		elif filename.endswith("svg"):
 			return "image/svg+xml"
+			return "application/octet-stream"
 	
 	def do_HEAD(self):
 		self.sendHeader()
@@ -119,5 +120,7 @@ if __name__ == '__main__':
 		httpd.serve_forever()
 	except KeyboardInterrupt:
 		pass
-	httpd.server_close()
-	printServerMessage("Server stop")
+	finally:
+		camera.close()
+		httpd.server_close()
+		printServerMessage("Server stop")

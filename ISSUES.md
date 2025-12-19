@@ -2,151 +2,99 @@
 
 ## High Priority
 
-### 2. Hardcoded URL in Frontend (webcam.html:143)
+### ~~2. Hardcoded URL in Frontend (webcam.html:143)~~ ✓ RESOLVED
 **Severity:** High - Portability Issue
 
-**Location:** `webcam.html:143`
+**Status:** Fixed - Now uses relative URL
 
-**Problem:**
-```javascript
-let webcamURL = "http://pi-noir-camera.local:8000/webcam.jpg?t=" + (new Date()).getTime();
-```
-Hardcoded hostname prevents using the app on different networks or devices.
-
-**Solution:**
-Use relative URL:
-```javascript
-let webcamURL = "webcam.jpg?t=" + (new Date()).getTime();
-```
+**Solution Implemented:**
+Changed to relative URL: `webcam.jpg?t=...` for better portability across different networks and devices.
 
 ---
 
 ## Medium Priority
 
-### 3. Missing Content-Type Default (webcam.py:51-61)
+### ~~3. Missing Content-Type Default (webcam.py:51-61)~~ ✓ RESOLVED
 **Severity:** Medium - Error Handling
 
-**Location:** `webcam.py:51-61`
+**Status:** Fixed - Returns default Content-Type for unknown extensions
 
-**Problem:**
-`contentTypeFrom()` returns `None` for unknown file extensions, which will cause errors in `sendHeader()`.
-
-**Solution:**
-Add default return value:
-```python
-return "application/octet-stream"
-```
+**Solution Implemented:**
+Added `else: return "application/octet-stream"` as default for unknown file types.
 
 ---
 
-### 4. No Error Handling for Image Loading (webcam.html:148-152)
+### ~~4. No Error Handling for Image Loading (webcam.html:148-152)~~ ✓ RESOLVED
 **Severity:** Medium - User Experience
 
-**Location:** `webcam.html:148-152`
+**Status:** Fixed - Added error handler with retry logic
 
-**Problem:**
-Image load failures are silently ignored. User has no feedback if camera stream stops.
-
-**Solution:**
-Add `onerror` handler to retry or display error status.
+**Solution Implemented:**
+Added `onerror` handler that logs errors, updates connection status, and retries after 1 second delay.
 
 ---
 
-### 5. Magic Numbers - Frame Rate Duplication (webcam.py:40)
+### ~~5. Magic Numbers - Frame Rate Duplication (webcam.py:40)~~ ✓ RESOLVED
 **Severity:** Medium - Code Quality
 
-**Location:** `webcam.py:40`
+**Status:** Fixed - Now uses camera.framerate property
 
-**Problem:**
-```python
-time.sleep(1.0 / 30)  # 30 fps
-```
-Duplicates the framerate value from line 12. Could get out of sync.
-
-**Solution:**
-```python
-time.sleep(1.0 / camera.framerate)
-```
+**Solution Implemented:**
+Changed `time.sleep(1.0 / 30)` to `time.sleep(1.0 / camera.framerate)` to eliminate duplication.
 
 ---
 
 ## Low Priority
 
-### 6. No Graceful Camera Shutdown (webcam.py:96+)
+### ~~6. No Graceful Camera Shutdown (webcam.py:96+)~~ ✓ RESOLVED
 **Severity:** Low - Resource Management
 
-**Location:** `webcam.py:96+`
+**Status:** Fixed - Camera properly closed on shutdown
 
-**Problem:**
-Camera isn't explicitly closed on shutdown. May leave camera resource locked.
-
-**Solution:**
-Add camera cleanup in finally block:
-```python
-try:
-    httpd.serve_forever()
-except KeyboardInterrupt:
-    pass
-finally:
-    camera.close()
-    httpd.server_close()
-```
+**Solution Implemented:**
+Added `finally` block that calls `camera.close()` and `httpd.server_close()` to ensure proper cleanup.
 
 ---
 
-### 7. Hardcoded Hostname in Python (webcam.py:19)
+### ~~7. Hardcoded Hostname in Python (webcam.py:19)~~ ✓ RESOLVED
 **Severity:** Low - Portability
 
-**Location:** `webcam.py:19`
+**Status:** Fixed - Now binds to all interfaces
 
-**Problem:**
-```python
-HOST_NAME = "pi-noir-camera.local"
-```
-Limits portability to devices with this specific hostname.
-
-**Solution:**
-Use `"0.0.0.0"` or make configurable via environment variable.
+**Solution Implemented:**
+Changed `HOST_NAME = "pi-noir-camera.local"` to `HOST_NAME = "0.0.0.0"` to bind to all network interfaces.
 
 ---
 
-### 8. No Loading State in UI (webcam.html)
+### ~~8. No Loading State in UI (webcam.html)~~ ✓ RESOLVED
 **Severity:** Low - User Experience
 
-**Location:** `webcam.html`
+**Status:** Fixed - Added connection status indicator
 
-**Problem:**
-User sees blank screen if initial connection fails. No feedback about connection status.
-
-**Solution:**
-Add loading indicator and connection status display.
+**Solution Implemented:**
+Added status div that displays "Connecting...", "Connected" (green), or "Connection lost, retrying..." (orange) based on stream state.
 
 ---
 
-### 9. Unchecked Interval Timer (webcam.html:158)
+### ~~9. Unchecked Interval Timer (webcam.html:158)~~ ✓ RESOLVED
 **Severity:** Low - Performance
 
-**Location:** `webcam.html:158`
+**Status:** Fixed - Replaced setInterval with setTimeout chain
 
-**Problem:**
-Interval continues even if images fail to load, potentially queueing up failed requests.
-
-**Solution:**
-Only schedule next refresh after current image loads successfully.
+**Solution Implemented:**
+Replaced `setInterval` with `setTimeout` called from `onload` and `onerror` handlers. Next refresh only scheduled after current image loads or fails.
 
 ---
 
-### 10. Accessibility Issues (webcam.html)
+### ~~10. Accessibility Issues (webcam.html)~~ ✓ RESOLVED
 **Severity:** Low - Accessibility
 
-**Location:** `webcam.html`
+**Status:** Fixed - Added ARIA attributes
 
-**Problems:**
-- Canvas has no alt text or aria-label
-- Buttons lack aria-pressed states for current rotation
-
-**Solution:**
-Add appropriate ARIA attributes.
+**Solution Implemented:**
+- Added `role="img"` and `aria-label="Live webcam feed"` to canvas
+- Added dynamic `aria-pressed` states to rotation buttons
+- Added `role="status"` and `aria-live="polite"` to status indicator
 
 ---
 

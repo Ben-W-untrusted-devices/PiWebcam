@@ -201,17 +201,15 @@ class TestContentTypeDetection(unittest.TestCase):
 			'image/svg+xml'
 		)
 
-	def test_unknown_content_type_returns_none(self):
-		"""Should return None for unknown file types (KNOWN ISSUE #4)"""
-		# This is a known issue - should return application/octet-stream
+	def test_unknown_content_type_returns_default(self):
+		"""Should return application/octet-stream for unknown file types (FIXED)"""
 		mock_request = Mock()
 		mock_request.makefile = Mock(return_value=io.BytesIO(b'GET / HTTP/1.1\r\n\r\n'))
 		handler = self.webcam.SimpleCloudFileServer(
 			mock_request, ('127.0.0.1', 8000), Mock()
 		)
 		result = handler.contentTypeFrom('file.xyz')
-		self.assertIsNone(result)
-		# TODO: Fix to return 'application/octet-stream' as default
+		self.assertEqual(result, 'application/octet-stream')
 
 
 class TestFrameCapture(unittest.TestCase):
@@ -423,16 +421,16 @@ class TestCameraConfiguration(unittest.TestCase):
 		self.assertEqual(webcam.camera.framerate, 30)
 
 	def test_camera_framerate_sync(self):
-		"""Capture loop sleep should match camera framerate (ISSUE #6)"""
+		"""Capture loop sleep should match camera framerate (FIXED)"""
 		import webcam
+		import inspect
 
-		# This test documents the current behavior
-		# The sleep time should ideally be: 1.0 / camera.framerate
-		expected_sleep = 1.0 / webcam.camera.framerate
-		hardcoded_sleep = 1.0 / 30
+		# Verify the sleep time uses camera.framerate instead of magic number
+		source = inspect.getsource(webcam.capture_loop)
 
-		self.assertEqual(expected_sleep, hardcoded_sleep)
-		# TODO: Update capture_loop to use camera.framerate instead of magic number
+		# Should use camera.framerate, not hardcoded 30
+		self.assertIn('camera.framerate', source)
+		self.assertNotIn('1.0 / 30', source)
 
 
 class TestServerConfiguration(unittest.TestCase):
