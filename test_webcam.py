@@ -592,6 +592,145 @@ class TestCORSHeaders(unittest.TestCase):
 		handler.send_response.assert_called()
 
 
+class TestAuthentication(unittest.TestCase):
+	"""Test HTTP Basic Authentication"""
+
+	def setUp(self):
+		sys.modules['picamera'] = MagicMock()
+		sys.modules['picamera'].PiCamera = MockPiCamera
+
+		import webcam as webcam_module
+		self.webcam = webcam_module
+
+		self.mock_request = Mock()
+		self.mock_request.makefile = Mock(return_value=io.BytesIO())
+
+	def test_auth_disabled_by_default(self):
+		"""Authentication should be disabled when env vars not set"""
+		# Save original values
+		original_enabled = self.webcam.AUTH_ENABLED
+
+		# Disable auth
+		self.webcam.AUTH_ENABLED = False
+
+		handler = self.webcam.SimpleCloudFileServer(
+			self.mock_request, ('127.0.0.1', 8000), Mock()
+		)
+
+		# Should return True when auth disabled
+		self.assertTrue(handler.check_auth())
+
+		# Restore
+		self.webcam.AUTH_ENABLED = original_enabled
+
+	def test_auth_required_when_enabled(self):
+		"""Should require auth when enabled and no header provided"""
+		# Enable auth
+		original_enabled = self.webcam.AUTH_ENABLED
+		original_user = self.webcam.AUTH_USER
+		original_pass = self.webcam.AUTH_PASS
+
+		self.webcam.AUTH_ENABLED = True
+		self.webcam.AUTH_USER = 'testuser'
+		self.webcam.AUTH_PASS = 'testpass'
+
+		handler = self.webcam.SimpleCloudFileServer(
+			self.mock_request, ('127.0.0.1', 8000), Mock()
+		)
+		handler.headers = {}
+
+		# Should return False when no auth header
+		self.assertFalse(handler.check_auth())
+
+		# Restore
+		self.webcam.AUTH_ENABLED = original_enabled
+		self.webcam.AUTH_USER = original_user
+		self.webcam.AUTH_PASS = original_pass
+
+	def test_auth_success_with_valid_credentials(self):
+		"""Should authenticate with valid credentials"""
+		import base64
+
+		original_enabled = self.webcam.AUTH_ENABLED
+		original_user = self.webcam.AUTH_USER
+		original_pass = self.webcam.AUTH_PASS
+
+		self.webcam.AUTH_ENABLED = True
+		self.webcam.AUTH_USER = 'testuser'
+		self.webcam.AUTH_PASS = 'testpass'
+
+		handler = self.webcam.SimpleCloudFileServer(
+			self.mock_request, ('127.0.0.1', 8000), Mock()
+		)
+
+		# Create valid auth header
+		credentials = base64.b64encode(b'testuser:testpass').decode('utf-8')
+		handler.headers = {'Authorization': f'Basic {credentials}'}
+
+		# Should return True with valid credentials
+		self.assertTrue(handler.check_auth())
+
+		# Restore
+		self.webcam.AUTH_ENABLED = original_enabled
+		self.webcam.AUTH_USER = original_user
+		self.webcam.AUTH_PASS = original_pass
+
+	def test_auth_fails_with_invalid_credentials(self):
+		"""Should reject invalid credentials"""
+		import base64
+
+		original_enabled = self.webcam.AUTH_ENABLED
+		original_user = self.webcam.AUTH_USER
+		original_pass = self.webcam.AUTH_PASS
+
+		self.webcam.AUTH_ENABLED = True
+		self.webcam.AUTH_USER = 'testuser'
+		self.webcam.AUTH_PASS = 'testpass'
+
+		handler = self.webcam.SimpleCloudFileServer(
+			self.mock_request, ('127.0.0.1', 8000), Mock()
+		)
+
+		# Create invalid auth header
+		credentials = base64.b64encode(b'wronguser:wrongpass').decode('utf-8')
+		handler.headers = {'Authorization': f'Basic {credentials}'}
+
+		# Should return False with invalid credentials
+		self.assertFalse(handler.check_auth())
+
+		# Restore
+		self.webcam.AUTH_ENABLED = original_enabled
+		self.webcam.AUTH_USER = original_user
+		self.webcam.AUTH_PASS = original_pass
+
+	def test_health_endpoint_accessible_without_auth(self):
+		"""Health endpoint should be accessible without authentication"""
+		original_enabled = self.webcam.AUTH_ENABLED
+
+		self.webcam.AUTH_ENABLED = True
+		self.webcam.AUTH_USER = 'testuser'
+		self.webcam.AUTH_PASS = 'testpass'
+
+		handler = self.webcam.SimpleCloudFileServer(
+			self.mock_request, ('127.0.0.1', 8000), Mock()
+		)
+		handler.send_response = Mock()
+		handler.send_header = Mock()
+		handler.end_headers = Mock()
+		handler.wfile = io.BytesIO()
+		handler.headers = {}  # No auth header
+
+		# Health endpoint should work without auth
+		handler.path = '/health'
+		handler.do_GET()
+
+		# Should return 200, not 401
+		handler.send_response.assert_called_with(200)
+
+		# Restore
+		self.webcam.AUTH_ENABLED = original_enabled
+
+
 class TestRegressionSuite(unittest.TestCase):
 	"""Regression tests for fixed bugs"""
 

@@ -4,6 +4,7 @@ import io
 import os
 import time
 import threading
+import base64
 from picamera import PiCamera
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -19,6 +20,11 @@ time.sleep(2)
 # hosting
 HOST_NAME = "0.0.0.0"  # Bind to all interfaces for better portability
 PORT_NUMBER = 8000 # Magic number. Can't bind under 1024 on normal user accounts; port 80 is the normal HTTP port
+
+# Authentication (optional - set env vars to enable)
+AUTH_USER = os.environ.get('WEBCAM_USER')
+AUTH_PASS = os.environ.get('WEBCAM_PASS')
+AUTH_ENABLED = AUTH_USER is not None and AUTH_PASS is not None
 
 # In-memory storage for current frame
 current_frame = None
@@ -66,7 +72,39 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 			return "image/svg+xml"
 		else:
 			return "application/octet-stream"
-	
+
+	def check_auth(self):
+		"""Check HTTP Basic Authentication. Returns True if authorized or auth disabled."""
+		if not AUTH_ENABLED:
+			return True
+
+		auth_header = self.headers.get('Authorization')
+		if auth_header is None:
+			return False
+
+		try:
+			# Parse "Basic base64string"
+			auth_type, auth_string = auth_header.split(' ', 1)
+			if auth_type.lower() != 'basic':
+				return False
+
+			# Decode credentials
+			decoded = base64.b64decode(auth_string).decode('utf-8')
+			username, password = decoded.split(':', 1)
+
+			# Verify credentials
+			return username == AUTH_USER and password == AUTH_PASS
+		except Exception:
+			return False
+
+	def send_auth_required(self):
+		"""Send 401 Unauthorized response with WWW-Authenticate header"""
+		self.send_response(401)
+		self.send_header('WWW-Authenticate', 'Basic realm="Webcam Access"')
+		self.send_header('Content-type', 'text/plain')
+		self.end_headers()
+		self.wfile.write(b'401 Unauthorized')
+
 	def do_HEAD(self):
 		self.sendHeader()
 
@@ -76,6 +114,12 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 	
 	def do_GET(self):
 		filename = (self.path[1:]).split("?")[0]
+
+		# Allow health endpoint without auth (for monitoring)
+		if filename != "health":
+			if not self.check_auth():
+				self.send_auth_required()
+				return
 
 		# Handle webcam requests - serve from memory
 		if filename == "webcam.jpg":

@@ -121,12 +121,33 @@ Replaced `setInterval` with `setTimeout` called from `onload` and `onerror` hand
 
 ---
 
+### ~~Authentication~~ ✓ RESOLVED
+**Status:** Fixed - Added optional HTTP Basic Authentication
+
+**Solution Implemented:**
+- HTTP Basic Authentication using environment variables
+- Optional - only enabled when `WEBCAM_USER` and `WEBCAM_PASS` env vars are set
+- Protects all endpoints except `/health` (for monitoring)
+- Returns 401 with WWW-Authenticate header when auth fails
+
+**Usage:**
+```bash
+# Enable authentication
+export WEBCAM_USER=your_username
+export WEBCAM_PASS=your_password
+python3 webcam.py
+
+# Or run without auth (default)
+python3 webcam.py
+```
+
+---
+
 ### Remaining Architecture Considerations
 
 These are longer-term architectural considerations:
 
-- **No HTTPS Support:** Streams and any future credentials sent unencrypted
-- **No Authentication:** Anyone on network can access camera stream
+- **No HTTPS Support:** Streams and credentials sent unencrypted (consider using reverse proxy with SSL)
 
 ---
 
