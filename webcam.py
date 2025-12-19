@@ -29,6 +29,9 @@ AUTH_ENABLED = False
 current_frame = None
 frame_lock = threading.Lock()
 
+# Motion detector instance (None if disabled)
+motion_detector = None
+
 # Motion detection functions
 def compare_frames(frame1_bytes, frame2_bytes, threshold=5.0):
 	"""
@@ -75,10 +78,124 @@ def compare_frames(frame1_bytes, frame2_bytes, threshold=5.0):
 		logger.error(f"Frame comparison error: {e}")
 		return 0.0
 
+# Motion detection state machine
+class MotionDetector:
+	"""Thread-safe motion detection state machine"""
+
+	# States
+	STATE_IDLE = "idle"
+	STATE_MOTION_DETECTED = "motion_detected"
+	STATE_COOLDOWN = "cooldown"
+
+	def __init__(self, threshold=5.0, cooldown_seconds=5.0):
+		"""
+		Initialize motion detector.
+
+		Args:
+			threshold: Percentage change threshold to trigger motion (0-100)
+			cooldown_seconds: Seconds to wait before detecting motion again
+		"""
+		self.threshold = threshold
+		self.cooldown_seconds = cooldown_seconds
+
+		self.state = self.STATE_IDLE
+		self.state_lock = threading.Lock()
+
+		self.motion_event_count = 0
+		self.last_motion_time = None
+		self.last_change_percentage = 0.0
+
+		self.previous_frame = None
+
+	def check_motion(self, current_frame_bytes):
+		"""
+		Check if motion is detected in current frame.
+
+		Args:
+			current_frame_bytes: Current frame as JPEG bytes
+
+		Returns:
+			Tuple of (motion_detected: bool, change_percentage: float)
+		"""
+		if current_frame_bytes is None:
+			return False, 0.0
+
+		with self.state_lock:
+			# Need a previous frame to compare
+			if self.previous_frame is None:
+				self.previous_frame = current_frame_bytes
+				return False, 0.0
+
+			# Compare frames
+			change_percentage = compare_frames(self.previous_frame, current_frame_bytes)
+			self.last_change_percentage = change_percentage
+
+			# Update previous frame for next comparison
+			self.previous_frame = current_frame_bytes
+
+			# Check if we're in cooldown
+			if self.state == self.STATE_COOLDOWN:
+				if self._is_cooldown_expired():
+					self.state = self.STATE_IDLE
+				else:
+					# Still in cooldown, don't trigger
+					return False, change_percentage
+
+			# Check if motion exceeds threshold
+			if change_percentage >= self.threshold:
+				if self.state == self.STATE_IDLE:
+					# New motion detected!
+					self.state = self.STATE_MOTION_DETECTED
+					self.motion_event_count += 1
+					self.last_motion_time = time.time()
+					return True, change_percentage
+				elif self.state == self.STATE_MOTION_DETECTED:
+					# Motion ongoing
+					self.last_motion_time = time.time()
+					return True, change_percentage
+			else:
+				# No motion detected
+				if self.state == self.STATE_MOTION_DETECTED:
+					# Motion ended, enter cooldown
+					self.state = self.STATE_COOLDOWN
+					self.last_motion_time = time.time()
+				return False, change_percentage
+
+			return False, change_percentage
+
+	def _is_cooldown_expired(self):
+		"""Check if cooldown period has expired"""
+		if self.last_motion_time is None:
+			return True
+		elapsed = time.time() - self.last_motion_time
+		return elapsed >= self.cooldown_seconds
+
+	def get_status(self):
+		"""
+		Get current motion detection status.
+
+		Returns:
+			Dict with status information (thread-safe)
+		"""
+		with self.state_lock:
+			return {
+				"state": self.state,
+				"motion_event_count": self.motion_event_count,
+				"last_motion_time": self.last_motion_time,
+				"last_change_percentage": self.last_change_percentage,
+				"threshold": self.threshold,
+				"cooldown_seconds": self.cooldown_seconds
+			}
+
+	def is_motion_active(self):
+		"""Check if motion is currently being detected (thread-safe)"""
+		with self.state_lock:
+			return self.state == self.STATE_MOTION_DETECTED
+
 # Background capture thread
 def capture_loop():
 	"""Continuously capture frames from camera to memory"""
-	global current_frame
+	global current_frame, motion_detector
 	while True:
 		try:
 			# Capture to in-memory buffer
@@ -86,8 +203,14 @@ def capture_loop():
 			camera.capture(stream, format='jpeg', use_video_port=True)
 
 			# Thread-safe update of current frame
+			frame_bytes = stream.getvalue()
 			with frame_lock:
-				current_frame = stream.getvalue()
+				current_frame = frame_bytes
+
+			# Check for motion if enabled
+			if motion_detector is not None:
+				motion_detected, change_pct = motion_detector.check_motion(frame_bytes)
+				# Motion event logging will be added in ticket 2.1
 
 			time.sleep(1.0 / camera.framerate)
 		except Exception as e:
