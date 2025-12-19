@@ -47,6 +47,10 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 	def sendHeader(self, response=200, contentType="image/jpeg"):
 		self.send_response(response)
 		self.send_header("Content-type", contentType)
+		# CORS headers for cross-origin access
+		self.send_header("Access-Control-Allow-Origin", "*")
+		self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+		self.send_header("Access-Control-Allow-Headers", "Content-Type")
 		self.end_headers()
 	
 	def contentTypeFrom(self, filename):
@@ -65,6 +69,10 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 	
 	def do_HEAD(self):
 		self.sendHeader()
+
+	def do_OPTIONS(self):
+		"""Handle CORS preflight requests"""
+		self.sendHeader(contentType="text/plain")
 	
 	def do_GET(self):
 		filename = (self.path[1:]).split("?")[0]
@@ -78,6 +86,30 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 				else:
 					self.sendHeader(response=503, contentType="text/plain")
 					self.wfile.write(b"Camera initializing, please wait")
+			return
+
+		# Handle health check endpoint
+		if filename == "health":
+			import json
+			with frame_lock:
+				camera_ready = current_frame is not None
+
+			health_status = {
+				"status": "ok",
+				"camera": {
+					"ready": camera_ready,
+					"resolution": f"{camera.resolution[0]}x{camera.resolution[1]}",
+					"framerate": camera.framerate
+				},
+				"server": {
+					"host": HOST_NAME,
+					"port": PORT_NUMBER
+				}
+			}
+
+			response_body = json.dumps(health_status, indent=2).encode('utf-8')
+			self.sendHeader(contentType="application/json")
+			self.wfile.write(response_body)
 			return
 
 		# Handle other file requests (like webcam.html)

@@ -489,6 +489,109 @@ class TestExceptionHandling(unittest.TestCase):
 		pass
 
 
+class TestHealthEndpoint(unittest.TestCase):
+	"""Test health check endpoint"""
+
+	def setUp(self):
+		sys.modules['picamera'] = MagicMock()
+		sys.modules['picamera'].PiCamera = MockPiCamera
+
+		import webcam as webcam_module
+		self.webcam = webcam_module
+
+		self.mock_request = Mock()
+		self.mock_request.makefile = Mock(return_value=io.BytesIO())
+
+	def test_health_endpoint_returns_json(self):
+		"""Health endpoint should return JSON with status"""
+		handler = self.webcam.SimpleCloudFileServer(
+			self.mock_request, ('127.0.0.1', 8000), Mock()
+		)
+		handler.send_response = Mock()
+		handler.send_header = Mock()
+		handler.end_headers = Mock()
+		handler.wfile = io.BytesIO()
+
+		handler.path = '/health'
+		handler.do_GET()
+
+		# Verify JSON content type
+		handler.send_header.assert_any_call('Content-type', 'application/json')
+
+		# Verify response contains expected fields
+		response_data = handler.wfile.getvalue().decode('utf-8')
+		self.assertIn('"status"', response_data)
+		self.assertIn('"camera"', response_data)
+		self.assertIn('"server"', response_data)
+
+	def test_health_endpoint_reports_camera_status(self):
+		"""Health endpoint should report camera readiness"""
+		import json
+
+		handler = self.webcam.SimpleCloudFileServer(
+			self.mock_request, ('127.0.0.1', 8000), Mock()
+		)
+		handler.send_response = Mock()
+		handler.send_header = Mock()
+		handler.end_headers = Mock()
+		handler.wfile = io.BytesIO()
+
+		# Set camera as ready
+		self.webcam.current_frame = b'test frame'
+		handler.path = '/health'
+		handler.do_GET()
+
+		response_data = json.loads(handler.wfile.getvalue().decode('utf-8'))
+		self.assertTrue(response_data['camera']['ready'])
+
+
+class TestCORSHeaders(unittest.TestCase):
+	"""Test CORS header support"""
+
+	def setUp(self):
+		sys.modules['picamera'] = MagicMock()
+		sys.modules['picamera'].PiCamera = MockPiCamera
+
+		import webcam as webcam_module
+		self.webcam = webcam_module
+
+		self.mock_request = Mock()
+		self.mock_request.makefile = Mock(return_value=io.BytesIO())
+
+	def test_cors_headers_present(self):
+		"""All responses should include CORS headers"""
+		handler = self.webcam.SimpleCloudFileServer(
+			self.mock_request, ('127.0.0.1', 8000), Mock()
+		)
+		handler.send_response = Mock()
+		handler.send_header = Mock()
+		handler.end_headers = Mock()
+		handler.wfile = io.BytesIO()
+
+		self.webcam.current_frame = b'test frame'
+		handler.path = '/webcam.jpg'
+		handler.do_GET()
+
+		# Verify CORS headers were sent
+		handler.send_header.assert_any_call('Access-Control-Allow-Origin', '*')
+
+	def test_options_request_handled(self):
+		"""OPTIONS requests should be handled for CORS preflight"""
+		handler = self.webcam.SimpleCloudFileServer(
+			self.mock_request, ('127.0.0.1', 8000), Mock()
+		)
+		handler.send_response = Mock()
+		handler.send_header = Mock()
+		handler.end_headers = Mock()
+		handler.wfile = io.BytesIO()
+
+		handler.path = '/webcam.jpg'
+		handler.do_OPTIONS()
+
+		# Should send response without error
+		handler.send_response.assert_called()
+
+
 class TestRegressionSuite(unittest.TestCase):
 	"""Regression tests for fixed bugs"""
 

@@ -100,12 +100,33 @@ Replaced `setInterval` with `setTimeout` called from `onload` and `onerror` hand
 
 ## Architecture Improvements
 
+### ~~CORS Headers~~ ✓ RESOLVED
+**Status:** Fixed - Added CORS headers for cross-origin requests
+
+**Solution Implemented:**
+- Added `Access-Control-Allow-Origin: *` header to all responses
+- Added `Access-Control-Allow-Methods` and `Access-Control-Allow-Headers`
+- Implemented `do_OPTIONS()` method for CORS preflight requests
+
+---
+
+### ~~Health Check Endpoint~~ ✓ RESOLVED
+**Status:** Fixed - Added `/health` endpoint
+
+**Solution Implemented:**
+- Added `/health` endpoint that returns JSON with server status
+- Reports camera readiness, resolution, framerate
+- Reports server host and port configuration
+- Useful for monitoring and automation
+
+---
+
+### Remaining Architecture Considerations
+
 These are longer-term architectural considerations:
 
 - **No HTTPS Support:** Streams and any future credentials sent unencrypted
 - **No Authentication:** Anyone on network can access camera stream
-- **No CORS Headers:** Limits ability to embed in other web applications
-- **No Health Check Endpoint:** Can't programmatically verify server is running
 
 ---
 
