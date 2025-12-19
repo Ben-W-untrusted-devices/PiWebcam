@@ -60,6 +60,7 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 			return "image/png"
 		elif filename.endswith("svg"):
 			return "image/svg+xml"
+		else:
 			return "application/octet-stream"
 	
 	def do_HEAD(self):
