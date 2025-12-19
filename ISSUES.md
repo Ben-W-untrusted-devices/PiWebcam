@@ -151,6 +151,26 @@ These are longer-term architectural considerations:
 
 ---
 
+## Future Improvements (Not Yet Planned)
+
+### Credential Storage Improvement
+**Status:** Decide later - current env var approach has security/usability issues
+
+**Current Issue:**
+- Environment variables visible in process list
+- Not persistent across reboots
+- Stored in shell history
+- Can't change without restart
+
+**Better Approaches to Consider:**
+1. Config file with bcrypt-hashed passwords (`.webcam.conf` with chmod 600)
+2. Systemd environment file (`/etc/webcam/credentials.env`)
+3. Integration with system keyring
+
+**Decision:** Defer until deployment requirements are clearer
+
+---
+
 ## Legend
 - **Critical:** Security vulnerabilities or data loss risks
 - **High:** Major functionality or portability issues

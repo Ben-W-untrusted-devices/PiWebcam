@@ -1,0 +1,30 @@
+[Unit]
+Description=PiWebcam Streaming Server
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/PiWebcam
+ExecStart=/usr/bin/python3 /home/pi/PiWebcam/webcam.py
+Restart=on-failure
+RestartSec=5
+
+# Optional: Enable authentication via environment variables
+# Environment="WEBCAM_USER=admin"
+# Environment="WEBCAM_PASS=your_password"
+
+# Or load from environment file (recommended for credentials)
+# EnvironmentFile=/etc/piwebcam/credentials.env
+
+# Security hardening
+# NoNewPrivileges=true
+# PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=piwebcam
+
+[Install]
+WantedBy=multi-user.target
