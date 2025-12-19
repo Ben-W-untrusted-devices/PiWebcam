@@ -9,6 +9,8 @@ import base64
 import argparse
 import logging
 from picamera import PiCamera
+from PIL import Image
+import numpy as np
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -26,6 +28,52 @@ AUTH_ENABLED = False
 # In-memory storage for current frame
 current_frame = None
 frame_lock = threading.Lock()
+
+# Motion detection functions
+def compare_frames(frame1_bytes, frame2_bytes, threshold=5.0):
+	"""
+	Compare two JPEG frames and return percentage of pixels changed.
+
+	Args:
+		frame1_bytes: First frame as JPEG bytes
+		frame2_bytes: Second frame as JPEG bytes
+		threshold: Pixel difference threshold (0-255) to consider a pixel changed
+
+	Returns:
+		Float percentage of pixels changed (0.0-100.0)
+		Returns 0.0 if frames cannot be compared
+	"""
+	if frame1_bytes is None or frame2_bytes is None:
+		return 0.0
+
+	try:
+		# Load images from bytes
+		img1 = Image.open(io.BytesIO(frame1_bytes))
+		img2 = Image.open(io.BytesIO(frame2_bytes))
+
+		# Convert to grayscale for efficiency
+		img1_gray = img1.convert('L')
+		img2_gray = img2.convert('L')
+
+		# Convert to numpy arrays for fast computation
+		arr1 = np.array(img1_gray, dtype=np.int16)
+		arr2 = np.array(img2_gray, dtype=np.int16)
+
+		# Calculate absolute difference
+		diff = np.abs(arr1 - arr2)
+
+		# Count pixels that changed more than threshold
+		changed_pixels = np.sum(diff > threshold)
+
+		# Calculate percentage
+		total_pixels = arr1.size
+		percentage = (changed_pixels / total_pixels) * 100.0
+
+		return percentage
+
+	except Exception as e:
+		logger.error(f"Frame comparison error: {e}")
+		return 0.0
 
 # Background capture thread
 def capture_loop():
