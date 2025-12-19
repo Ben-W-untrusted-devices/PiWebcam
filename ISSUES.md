@@ -143,6 +143,42 @@ python3 webcam.py
 
 ---
 
+### ~~Deployment Support~~ ✓ RESOLVED
+**Status:** Fixed - Added systemd service and installation script
+
+**Solution Implemented:**
+- Created `piwebcam.service` for systemd
+- Auto-start on boot, auto-restart on failure
+- Proper logging via journald
+- Support for EnvironmentFile for credentials
+- Installation script (`install-service.sh`)
+
+---
+
+### ~~Configuration Flexibility~~ ✓ RESOLVED
+**Status:** Fixed - Added command-line arguments
+
+**Solution Implemented:**
+- `--host`, `--port` for server configuration
+- `--resolution`, `--framerate` for camera configuration
+- `--no-auth` to disable authentication
+- Full `--help` documentation
+- No more hardcoded values
+
+---
+
+### ~~Logging~~ ✓ RESOLVED
+**Status:** Fixed - Replaced print() with Python logging module
+
+**Solution Implemented:**
+- Python logging module with configurable levels
+- `--log-level` CLI argument (DEBUG, INFO, WARNING, ERROR)
+- Proper timestamps and formatting
+- Integrates with systemd/journald
+- All messages properly categorized (info, warning, error)
+
+---
+
 ### Remaining Architecture Considerations
 
 These are longer-term architectural considerations:

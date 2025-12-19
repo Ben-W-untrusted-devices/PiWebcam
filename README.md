@@ -37,6 +37,16 @@ Access at: `http://<raspberry-pi-ip>:8000/webcam.html`
 --resolution WxH       Camera resolution (default: 640x480)
 --framerate FPS        Camera framerate (default: 30)
 --no-auth              Disable authentication even if credentials set
+--log-level LEVEL      Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO)
+```
+
+**Example with logging:**
+```bash
+# Debug mode for troubleshooting
+python3 webcam.py --log-level DEBUG
+
+# Quiet mode (errors only)
+python3 webcam.py --log-level ERROR
 ```
 
 ## Endpoints

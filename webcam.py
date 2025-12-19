@@ -7,9 +7,13 @@ import time
 import threading
 import base64
 import argparse
+import logging
 from picamera import PiCamera
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
+
+# Configure logging
+logger = logging.getLogger('piwebcam')
 
 # Global variables (will be set by parse_args or defaults)
 camera = None
@@ -39,7 +43,7 @@ def capture_loop():
 
 			time.sleep(1.0 / camera.framerate)
 		except Exception as e:
-			printServerMessage(f"Capture error: {e}")
+			logger.error(f"Capture error: {e}")
 			time.sleep(1)
 
 class SimpleCloudFileServer(BaseHTTPRequestHandler):
@@ -158,7 +162,7 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 
 			# Reject if path tries to escape current directory
 			if not requested_path.startswith(current_dir):
-				printServerMessage(f"Path traversal attempt blocked: {filename}")
+				logger.warning(f"Path traversal attempt blocked: {filename}")
 				self.sendHeader(response=403, contentType="text/plain")
 				self.wfile.write(b"403 Forbidden")
 				return
@@ -168,12 +172,9 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 				self.sendHeader(contentType=self.contentTypeFrom(filename))
 				self.wfile.write(data)
 		except (FileNotFoundError, IOError):
-			printServerMessage("File not found: " + filename)
+			logger.info(f"File not found: {filename}")
 			self.sendHeader(response=404, contentType="text/plain")
 			self.wfile.write(b"404 file not found")
-
-def printServerMessage(customMessage):
-	print(customMessage, "(Time: %s, Host: %s, port: %s)" % (time.asctime(), HOST_NAME, PORT_NUMBER))
 
 def parse_args():
 	"""Parse command-line arguments"""
@@ -200,6 +201,9 @@ Examples:
 		help='Camera framerate (default: 30)')
 	parser.add_argument('--no-auth', action='store_true',
 		help='Disable authentication even if WEBCAM_USER/WEBCAM_PASS are set')
+	parser.add_argument('--log-level', default='INFO',
+		choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
+		help='Logging level (default: INFO)')
 
 	return parser.parse_args()
 
@@ -211,7 +215,7 @@ def initialize_camera(resolution_str, framerate):
 	try:
 		width, height = map(int, resolution_str.split('x'))
 	except ValueError:
-		print(f"Error: Invalid resolution format '{resolution_str}'. Use WIDTHxHEIGHT (e.g., 640x480)")
+		logger.error(f"Invalid resolution format '{resolution_str}'. Use WIDTHxHEIGHT (e.g., 640x480)")
 		sys.exit(1)
 
 	camera = PiCamera()
@@ -220,7 +224,7 @@ def initialize_camera(resolution_str, framerate):
 
 	# Camera warm-up time
 	time.sleep(2)
-	print(f"Camera initialized: {width}x{height} @ {framerate}fps")
+	logger.info(f"Camera initialized: {width}x{height} @ {framerate}fps")
 
 def main():
 	"""Main entry point"""
@@ -228,6 +232,14 @@ def main():
 
 	# Parse command-line arguments
 	args = parse_args()
+
+	# Configure logging
+	log_level = getattr(logging, args.log_level)
+	logging.basicConfig(
+		level=log_level,
+		format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+		datefmt='%Y-%m-%d %H:%M:%S'
+	)
 
 	# Update global configuration
 	HOST_NAME = args.host
@@ -237,9 +249,9 @@ def main():
 	AUTH_ENABLED = (AUTH_USER is not None and AUTH_PASS is not None) and not args.no_auth
 
 	if AUTH_ENABLED:
-		print(f"Authentication enabled for user: {AUTH_USER}")
+		logger.info(f"Authentication enabled for user: {AUTH_USER}")
 	else:
-		print("Authentication disabled")
+		logger.info("Authentication disabled")
 
 	# Initialize camera
 	initialize_camera(args.resolution, args.framerate)
@@ -247,21 +259,21 @@ def main():
 	# Start background capture thread
 	capture_thread = threading.Thread(target=capture_loop, daemon=True)
 	capture_thread.start()
-	printServerMessage("Camera capture thread started")
+	logger.info("Camera capture thread started")
 
 	# Start HTTP server
 	server_class = HTTPServer
 	httpd = server_class((HOST_NAME, PORT_NUMBER), SimpleCloudFileServer)
 
-	printServerMessage("Server startup")
+	logger.info(f"Server started on {HOST_NAME}:{PORT_NUMBER}")
 	try:
 		httpd.serve_forever()
 	except KeyboardInterrupt:
-		pass
+		logger.info("Received shutdown signal")
 	finally:
 		camera.close()
 		httpd.server_close()
-		printServerMessage("Server stop")
+		logger.info("Server stopped")
 
 if __name__ == '__main__':
 	main()
