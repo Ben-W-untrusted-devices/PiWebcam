@@ -12,16 +12,32 @@ Webcam streaming server for Raspberry Pi Camera (optimized for Pi Zero with NOIR
 ## Quick Start
 
 ```bash
-# Run without authentication
+# Run with defaults (640x480 @ 30fps on port 8000)
 python3 webcam.py
 
 # Run with authentication
 export WEBCAM_USER=your_username
 export WEBCAM_PASS=your_password
 python3 webcam.py
+
+# Run with custom settings
+python3 webcam.py --port 8080 --resolution 1280x720 --framerate 15
+
+# View all options
+python3 webcam.py --help
 ```
 
 Access at: `http://<raspberry-pi-ip>:8000/webcam.html`
+
+## Command-Line Options
+
+```
+--host HOST            Host to bind to (default: 0.0.0.0)
+--port PORT            Port to bind to (default: 8000)
+--resolution WxH       Camera resolution (default: 640x480)
+--framerate FPS        Camera framerate (default: 30)
+--no-auth              Disable authentication even if credentials set
+```
 
 ## Endpoints
 

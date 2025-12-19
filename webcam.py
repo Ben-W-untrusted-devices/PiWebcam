@@ -2,29 +2,22 @@
 
 import io
 import os
+import sys
 import time
 import threading
 import base64
+import argparse
 from picamera import PiCamera
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-camera = PiCamera()
-camera.resolution = (640, 480)
-camera.framerate = 30
-#camera.start_preview()
-
-#camera warm-up time
-time.sleep(2)
-
-# hosting
-HOST_NAME = "0.0.0.0"  # Bind to all interfaces for better portability
-PORT_NUMBER = 8000 # Magic number. Can't bind under 1024 on normal user accounts; port 80 is the normal HTTP port
-
-# Authentication (optional - set env vars to enable)
-AUTH_USER = os.environ.get('WEBCAM_USER')
-AUTH_PASS = os.environ.get('WEBCAM_PASS')
-AUTH_ENABLED = AUTH_USER is not None and AUTH_PASS is not None
+# Global variables (will be set by parse_args or defaults)
+camera = None
+HOST_NAME = None
+PORT_NUMBER = None
+AUTH_USER = None
+AUTH_PASS = None
+AUTH_ENABLED = False
 
 # In-memory storage for current frame
 current_frame = None
@@ -181,8 +174,76 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 
 def printServerMessage(customMessage):
 	print(customMessage, "(Time: %s, Host: %s, port: %s)" % (time.asctime(), HOST_NAME, PORT_NUMBER))
-	
-if __name__ == '__main__':
+
+def parse_args():
+	"""Parse command-line arguments"""
+	parser = argparse.ArgumentParser(
+		description='PiWebcam - Raspberry Pi Camera Streaming Server',
+		formatter_class=argparse.RawDescriptionHelpFormatter,
+		epilog='''
+Examples:
+  %(prog)s                          # Run with defaults
+  %(prog)s --port 8080              # Use custom port
+  %(prog)s --resolution 1280x720    # HD resolution
+  %(prog)s --framerate 15           # Lower framerate
+  %(prog)s --no-auth                # Disable authentication
+		'''
+	)
+
+	parser.add_argument('--host', default='0.0.0.0',
+		help='Host to bind to (default: 0.0.0.0)')
+	parser.add_argument('--port', type=int, default=8000,
+		help='Port to bind to (default: 8000)')
+	parser.add_argument('--resolution', default='640x480',
+		help='Camera resolution WIDTHxHEIGHT (default: 640x480)')
+	parser.add_argument('--framerate', type=int, default=30,
+		help='Camera framerate (default: 30)')
+	parser.add_argument('--no-auth', action='store_true',
+		help='Disable authentication even if WEBCAM_USER/WEBCAM_PASS are set')
+
+	return parser.parse_args()
+
+def initialize_camera(resolution_str, framerate):
+	"""Initialize and configure camera"""
+	global camera
+
+	# Parse resolution string
+	try:
+		width, height = map(int, resolution_str.split('x'))
+	except ValueError:
+		print(f"Error: Invalid resolution format '{resolution_str}'. Use WIDTHxHEIGHT (e.g., 640x480)")
+		sys.exit(1)
+
+	camera = PiCamera()
+	camera.resolution = (width, height)
+	camera.framerate = framerate
+
+	# Camera warm-up time
+	time.sleep(2)
+	print(f"Camera initialized: {width}x{height} @ {framerate}fps")
+
+def main():
+	"""Main entry point"""
+	global HOST_NAME, PORT_NUMBER, AUTH_USER, AUTH_PASS, AUTH_ENABLED
+
+	# Parse command-line arguments
+	args = parse_args()
+
+	# Update global configuration
+	HOST_NAME = args.host
+	PORT_NUMBER = args.port
+	AUTH_USER = os.environ.get('WEBCAM_USER')
+	AUTH_PASS = os.environ.get('WEBCAM_PASS')
+	AUTH_ENABLED = (AUTH_USER is not None and AUTH_PASS is not None) and not args.no_auth
+
+	if AUTH_ENABLED:
+		print(f"Authentication enabled for user: {AUTH_USER}")
+	else:
+		print("Authentication disabled")
+
+	# Initialize camera
+	initialize_camera(args.resolution, args.framerate)
+
 	# Start background capture thread
 	capture_thread = threading.Thread(target=capture_loop, daemon=True)
 	capture_thread.start()
@@ -201,3 +262,6 @@ if __name__ == '__main__':
 		camera.close()
 		httpd.server_close()
 		printServerMessage("Server stop")
+
+if __name__ == '__main__':
+	main()
