@@ -9,13 +9,20 @@ import base64
 import argparse
 import logging
 from picamera import PiCamera
-from PIL import Image
-import numpy as np
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # Configure logging
 logger = logging.getLogger('piwebcam')
+
+# Optional dependencies for motion detection
+try:
+	from PIL import Image
+	import numpy as np
+	MOTION_DETECTION_AVAILABLE = True
+except ImportError as e:
+	MOTION_DETECTION_AVAILABLE = False
+	MOTION_DETECTION_IMPORT_ERROR = str(e)
 
 # Global variables (will be set by parse_args or defaults)
 camera = None
@@ -609,6 +616,13 @@ def main():
 
 	# Initialize motion detection if enabled
 	if args.motion_detect:
+		# Check if motion detection dependencies are available
+		if not MOTION_DETECTION_AVAILABLE:
+			logger.error("Motion detection requires PIL (Pillow) and numpy libraries")
+			logger.error(f"Import error: {MOTION_DETECTION_IMPORT_ERROR}")
+			logger.error("Install with: pip3 install -r requirements.txt")
+			sys.exit(1)
+
 		# Validate threshold range
 		if not 0 <= args.motion_threshold <= 100:
 			logger.error(f"Motion threshold must be between 0 and 100, got {args.motion_threshold}")
