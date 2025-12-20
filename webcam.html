@@ -84,6 +84,33 @@
 			background-color: #666;
 			border-color: #888;
 		}
+
+		#motionIndicator {
+			background-color: #333;
+			color: white;
+			padding: 10px 20px;
+			margin: 10px 0;
+			border-radius: 5px;
+			font-size: 14px;
+			display: none;
+		}
+
+		#motionIndicator.motion-active {
+			display: block;
+			background-color: #f44336;
+			animation: pulse 1s infinite;
+		}
+
+		@keyframes pulse {
+			0%, 100% { opacity: 1; }
+			50% { opacity: 0.7; }
+		}
+
+		#motionIndicator.motion-enabled {
+			display: block;
+			background-color: #444;
+			color: #aaa;
+		}
 	</style>
 </head>
 <body>
@@ -91,6 +118,7 @@
 		<canvas id="webcamElement" width="640" height="480" role="img" aria-label="Live webcam feed"></canvas>
 		<div id="status" style="color: white; margin-top: 10px; font-size: 14px;" role="status" aria-live="polite">Connecting...</div>
 	</div>
+	<div id="motionIndicator" role="status" aria-live="polite">Motion Detection: Idle</div>
 	<div id="controls">
 		<button id="btn-n" onclick="setRotation('N')">N (0°)</button>
 		<button id="btn-e" onclick="setRotation('E')">E (90°)</button>
@@ -167,11 +195,48 @@
 			nextWebcamImage.src = webcamURL;
 		}
 
+		// Motion detection polling
+		function updateMotionStatus() {
+			fetch('health')
+				.then(response => response.json())
+				.then(data => {
+					const motionIndicator = document.getElementById('motionIndicator');
+
+					if (data.motion && data.motion.enabled) {
+						if (data.motion.currently_detecting) {
+							// Motion is being detected
+							motionIndicator.className = 'motion-active';
+							motionIndicator.textContent = 'Motion Detected!';
+						} else {
+							// Motion detection enabled but idle
+							motionIndicator.className = 'motion-enabled';
+							const totalEvents = data.motion.total_events || 0;
+							if (data.motion.last_event_time) {
+								const lastTime = new Date(data.motion.last_event_time * 1000).toLocaleTimeString();
+								motionIndicator.textContent = `Motion Detection: ${totalEvents} events, last at ${lastTime}`;
+							} else {
+								motionIndicator.textContent = `Motion Detection: ${totalEvents} events`;
+							}
+						}
+					} else {
+						// Motion detection disabled
+						motionIndicator.style.display = 'none';
+					}
+				})
+				.catch(error => {
+					console.error('Failed to fetch motion status:', error);
+				});
+		}
+
 		// Apply initial rotation from URL
 		applyRotation();
 
 		// Start the refresh cycle
 		refreshWebcamPixels();
+
+		// Poll motion status every 2 seconds
+		updateMotionStatus();
+		setInterval(updateMotionStatus, 2000);
 	</script>
 </body>
 </html>
