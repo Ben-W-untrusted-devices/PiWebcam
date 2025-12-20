@@ -404,10 +404,80 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 				}
 			}
 
+			# Add motion detection status if enabled
+			if motion_detector is not None:
+				status = motion_detector.get_status()
+				health_status["motion"] = {
+					"enabled": True,
+					"currently_detecting": motion_detector.is_motion_active(),
+					"total_events": status['motion_event_count'],
+					"last_event_time": status['last_motion_time']
+				}
+			else:
+				health_status["motion"] = {
+					"enabled": False
+				}
+
 			response_body = json.dumps(health_status, indent=2).encode('utf-8')
 			self.sendHeader(contentType="application/json")
 			self.wfile.write(response_body)
 			return
+
+		# Handle detailed motion status endpoint
+		if filename == "motion/status":
+			import json
+			if motion_detector is None:
+				self.sendHeader(response=404, contentType="application/json")
+				self.wfile.write(json.dumps({"error": "Motion detection not enabled"}).encode('utf-8'))
+				return
+
+			status = motion_detector.get_status()
+			motion_status = {
+				"enabled": True,
+				"state": status['state'],
+				"currently_detecting": motion_detector.is_motion_active(),
+				"motion_event_count": status['motion_event_count'],
+				"last_motion_time": status['last_motion_time'],
+				"last_change_percentage": status['last_change_percentage'],
+				"config": {
+					"threshold": status['threshold'],
+					"cooldown_seconds": status['cooldown_seconds']
+				},
+				"snapshot": {
+					"enabled": MOTION_SNAPSHOT_ENABLED,
+					"directory": MOTION_SNAPSHOT_DIR if MOTION_SNAPSHOT_ENABLED else None,
+					"limit": MOTION_SNAPSHOT_LIMIT if MOTION_SNAPSHOT_ENABLED else None,
+					"latest": latest_snapshot_path
+				}
+			}
+
+			response_body = json.dumps(motion_status, indent=2).encode('utf-8')
+			self.sendHeader(contentType="application/json")
+			self.wfile.write(response_body)
+			return
+
+		# Handle latest motion snapshot endpoint
+		if filename == "motion/snapshot":
+			if motion_detector is None:
+				self.sendHeader(response=404, contentType="text/plain")
+				self.wfile.write(b"Motion detection not enabled")
+				return
+
+			if not MOTION_SNAPSHOT_ENABLED or latest_snapshot_path is None:
+				self.sendHeader(response=404, contentType="text/plain")
+				self.wfile.write(b"No snapshot available")
+				return
+
+			try:
+				with open(latest_snapshot_path, 'rb') as f:
+					snapshot_data = f.read()
+				self.sendHeader(contentType="image/jpeg")
+				self.wfile.write(snapshot_data)
+				return
+			except (FileNotFoundError, IOError):
+				self.sendHeader(response=404, contentType="text/plain")
+				self.wfile.write(b"Snapshot file not found")
+				return
 
 		# Handle other file requests (like webcam.html)
 		try:
