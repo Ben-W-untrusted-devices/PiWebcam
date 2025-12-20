@@ -2,6 +2,50 @@
 
 ## Completed Improvements
 
+### Motion Detection Feature (December 2024)
+**Priority:** Medium | **Complexity:** Medium | **Time:** 8 tickets across 3 phases
+
+Complete motion detection system using frame differencing algorithm:
+
+**Phase 1: Core Detection**
+- ✅ Frame comparison logic with grayscale conversion and pixel differencing
+- ✅ MotionDetector state machine (idle → motion_detected → cooldown)
+- ✅ CLI arguments: --motion-detect, --motion-threshold, --motion-cooldown
+- ✅ Threshold validation (0-100 range)
+- ✅ Thread-safe state tracking
+
+**Phase 2: Actions & Events**
+- ✅ Motion event logging (INFO for detection, DEBUG for motion end)
+- ✅ Snapshot saving on motion detection
+- ✅ Configurable snapshot directory and rotation limit
+- ✅ Timestamp-based filenames (motion_YYYYMMDD_HHMMSS.jpg)
+- ✅ Enhanced /health endpoint with motion status
+- ✅ /motion/status endpoint for detailed information
+- ✅ /motion/snapshot endpoint for latest snapshot image
+
+**Phase 3: UI & Polish**
+- ✅ Real-time motion indicator in web UI (pulsing red badge)
+- ✅ Event counter and last detection timestamp display
+- ✅ Comprehensive documentation in README
+- ✅ Configuration guide and troubleshooting section
+- ✅ Unit tests for frame comparison and state machine
+
+**Technical Details:**
+- Uses PIL/Pillow and numpy for efficient image processing
+- Configurable sensitivity (threshold) and cooldown period
+- Automatic cleanup of old snapshots when limit exceeded
+- Proper error handling and graceful degradation
+- No performance impact when disabled
+
+**Files Modified:**
+- webcam.py: +450 lines (core implementation)
+- webcam.html: +65 lines (UI indicator)
+- README.md: +143 lines (documentation)
+- requirements.txt: Added (PIL, numpy dependencies)
+- test_motion_detection.py: +287 lines (test suite)
+
+---
+
 ### Security
 - ✅ **Path Traversal Vulnerability** - Added path validation with 403 responses
 - ✅ **HTTP Basic Authentication** - Optional auth via WEBCAM_USER/WEBCAM_PASS env vars

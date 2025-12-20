@@ -8,23 +8,7 @@
 
 ## In Progress
 
-### Motion Detection Feature
-**Priority:** Medium
-**Complexity:** Medium
-**Estimate:** 8-10 hours across 8 tickets
-
-**Status:** Project planning complete, implementation pending
-
-**Tracking:** See [features/motion_detection.md](features/motion_detection.md) for detailed task breakdown
-
-**Summary:**
-- Frame differencing algorithm for motion detection
-- Configurable threshold and cooldown
-- Snapshot saving on motion events
-- API endpoints for motion status
-- Web UI indicator
-
-**Next Step:** Ticket 1.1 - Frame Comparison Logic
+_No issues currently in progress_
 
 ---
 
