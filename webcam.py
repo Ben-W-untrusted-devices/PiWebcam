@@ -210,7 +210,16 @@ def capture_loop():
 			# Check for motion if enabled
 			if motion_detector is not None:
 				motion_detected, change_pct = motion_detector.check_motion(frame_bytes)
-				# Motion event logging will be added in ticket 2.1
+
+				# Log motion events
+				if motion_detected:
+					status = motion_detector.get_status()
+					logger.info(f"Motion detected! Change: {change_pct:.2f}%, Event #{status['motion_event_count']}")
+				else:
+					# Log motion ended only when state changes from motion_detected to cooldown
+					status = motion_detector.get_status()
+					if status['state'] == MotionDetector.STATE_COOLDOWN and change_pct < motion_detector.threshold:
+						logger.debug(f"Motion ended. Change: {change_pct:.2f}%")
 
 			time.sleep(1.0 / camera.framerate)
 		except Exception as e:
