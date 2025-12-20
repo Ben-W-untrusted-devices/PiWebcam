@@ -414,7 +414,7 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 				"camera": {
 					"ready": camera_ready,
 					"resolution": f"{camera.resolution[0]}x{camera.resolution[1]}",
-					"framerate": camera.framerate
+					"framerate": float(camera.framerate)
 				},
 				"server": {
 					"host": HOST_NAME,
