@@ -178,6 +178,7 @@ class MotionDetector:
 		self.last_change_percentage = 0.0
 
 		self.previous_frame = None
+		self.baseline_frame = None  # Frame to compare against when detecting motion end
 
 	def check_motion(self, current_frame_bytes):
 		"""
@@ -196,6 +197,7 @@ class MotionDetector:
 			# Need a previous frame to compare
 			if self.previous_frame is None:
 				self.previous_frame = current_frame_bytes
+				self.baseline_frame = current_frame_bytes
 				return False, 0.0
 
 			# Compare frames
@@ -209,29 +211,38 @@ class MotionDetector:
 			if self.state == self.STATE_COOLDOWN:
 				if self._is_cooldown_expired():
 					self.state = self.STATE_IDLE
+					self.baseline_frame = current_frame_bytes
+					# Fall through to check if this frame triggers new motion
 				else:
 					# Still in cooldown, don't trigger
 					return False, change_percentage
 
-			# Check if motion exceeds threshold
-			if change_percentage >= self.threshold:
-				if self.state == self.STATE_IDLE:
+			# Handle state transitions based on current state
+			if self.state == self.STATE_IDLE:
+				# Check if motion started
+				if change_percentage >= self.threshold:
 					# New motion detected!
 					self.state = self.STATE_MOTION_DETECTED
 					self.motion_event_count += 1
 					self.last_motion_time = time.time()
 					return True, change_percentage
-				elif self.state == self.STATE_MOTION_DETECTED:
-					# Motion ongoing
-					self.last_motion_time = time.time()
-					return True, change_percentage
-			else:
-				# No motion detected
-				if self.state == self.STATE_MOTION_DETECTED:
-					# Motion ended, enter cooldown
+				else:
+					return False, change_percentage
+
+			elif self.state == self.STATE_MOTION_DETECTED:
+				# Always check if we've returned to baseline (motion ended)
+				baseline_change = compare_frames(self.baseline_frame, current_frame_bytes)
+				if baseline_change < self.threshold:
+					# Returned to baseline, motion ended
 					self.state = self.STATE_COOLDOWN
 					self.last_motion_time = time.time()
-				return False, change_percentage
+					return False, change_percentage
+				else:
+					# Still away from baseline (motion ongoing)
+					if change_percentage >= self.threshold:
+						# Update timestamp on significant changes
+						self.last_motion_time = time.time()
+					return True, change_percentage
 
 			return False, change_percentage
 

@@ -41,6 +41,35 @@ server {
 
 ---
 
+### Optional Dependencies with Graceful Degradation
+**Priority:** Medium
+**Complexity:** Medium
+
+**Issue:**
+Motion detection requires Pillow and numpy (specified in `requirements.txt`). If these libraries are not installed, the application crashes on startup when `--motion-detect` is enabled.
+
+**Required behavior:**
+Need to ensure that requirements are optional. If these libraries are not installed, the features depending on them should degrade gracefully.
+
+**Possible approaches:**
+- Try/except import blocks with feature detection
+- Check for library availability at startup
+- Disable motion detection with warning message if dependencies missing
+- Only import motion detection libraries when `--motion-detect` flag is used
+
+**Example:**
+```python
+try:
+    from PIL import Image
+    import numpy as np
+    MOTION_DETECTION_AVAILABLE = True
+except ImportError:
+    MOTION_DETECTION_AVAILABLE = False
+    logging.warning("Motion detection unavailable: PIL/numpy not installed")
+```
+
+---
+
 ## Future Considerations (Not Yet Planned)
 
 ### Credential Storage

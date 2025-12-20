@@ -46,6 +46,37 @@ Complete motion detection system using frame differencing algorithm:
 
 ---
 
+### Motion Detection Cooldown State Machine Fix (December 2024)
+**Priority:** Medium | **Complexity:** Low
+
+Fixed critical bugs in the motion detection state machine that prevented proper cooldown behavior:
+
+**Issues Resolved:**
+- ✅ State now properly transitions to cooldown when motion ends (frame returns to baseline)
+- ✅ Cooldown prevents immediate re-triggering of motion events
+- ✅ `is_motion_active()` correctly returns False during cooldown state
+- ✅ Motion event counter properly increments for multiple motion sessions
+- ✅ Cooldown expiration now correctly allows new motion detection
+
+**Technical Changes:**
+- Added baseline frame tracking to detect when frames return to original state
+- Restructured state machine logic to check baseline when in MOTION_DETECTED state
+- Fixed cooldown expiration to fall through and check for new motion in same frame
+- All 17 motion detection unit tests now pass on Raspberry Pi hardware
+
+**Test Results:**
+```
+test_cooldown_expires - PASS
+test_cooldown_prevents_retriggering - PASS
+test_is_motion_active - PASS
+test_motion_event_counter - PASS
+```
+
+**Files Modified:**
+- webcam.py:162-247 (`MotionDetector` class)
+
+---
+
 ### Security
 - ✅ **Path Traversal Vulnerability** - Added path validation with 403 responses
 - ✅ **HTTP Basic Authentication** - Optional auth via WEBCAM_USER/WEBCAM_PASS env vars
