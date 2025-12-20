@@ -77,6 +77,68 @@ test_motion_event_counter - PASS
 
 ---
 
+### Optional Dependencies with Graceful Degradation (December 2024)
+**Priority:** Medium | **Complexity:** Medium
+
+Made PIL (Pillow) and numpy dependencies optional with graceful degradation:
+
+**Issues Resolved:**
+- ✅ Application no longer crashes at startup if PIL/numpy are missing
+- ✅ Motion detection dependencies loaded conditionally with try/except
+- ✅ Clear error messages when motion detection is requested without dependencies
+- ✅ Helpful installation instructions provided in error message
+- ✅ Application runs normally without motion detection when libraries unavailable
+
+**Technical Changes:**
+- Wrapped PIL and numpy imports in try/except block
+- Added `MOTION_DETECTION_AVAILABLE` flag to track library availability
+- Check flag before initializing `MotionDetector` class
+- Provide actionable error message: "Install with: pip3 install -r requirements.txt"
+- Motion detection code only executes when dependencies are present
+
+**User Experience:**
+```
+# Without PIL/numpy installed, running with motion detection:
+$ python3 webcam.py --motion-detect
+ERROR - Motion detection requires PIL (Pillow) and numpy libraries
+ERROR - Import error: No module named 'PIL'
+ERROR - Install with: pip3 install -r requirements.txt
+
+# Without PIL/numpy installed, running without motion detection:
+$ python3 webcam.py
+INFO - Authentication disabled
+INFO - Camera initialized: 640x480 @ 30fps
+INFO - Server started at http://0.0.0.0:8000
+```
+
+**Files Modified:**
+- webcam.py:19-25 (conditional imports)
+- webcam.py:619-624 (dependency check)
+
+---
+
+### JSON Serialization Fix for PiCamera Objects (December 2024)
+**Priority:** High | **Complexity:** Low
+
+Fixed crash in /health endpoint caused by non-JSON-serializable PiCamera objects:
+
+**Issue:**
+The `/health` endpoint was including `camera.framerate` directly in JSON response. PiCamera returns a `PiCameraFraction` object for framerate, which cannot be serialized to JSON, causing crashes when clients poll the health endpoint.
+
+**Error:**
+```
+TypeError: Object of type PiCameraFraction is not JSON serializable
+```
+
+**Fix:**
+- Convert `camera.framerate` to float before JSON serialization
+- Changed `"framerate": camera.framerate` to `"framerate": float(camera.framerate)`
+
+**Files Modified:**
+- webcam.py:417 (/health endpoint)
+
+---
+
 ### Security
 - ✅ **Path Traversal Vulnerability** - Added path validation with 403 responses
 - ✅ **HTTP Basic Authentication** - Optional auth via WEBCAM_USER/WEBCAM_PASS env vars

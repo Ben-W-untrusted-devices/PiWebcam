@@ -413,7 +413,7 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 				"status": "ok",
 				"camera": {
 					"ready": camera_ready,
-					"resolution": f"{camera.resolution[0]}x{camera.resolution[1]}",
+					"resolution": f"{int(camera.resolution[0])}x{int(camera.resolution[1])}",
 					"framerate": float(camera.framerate)
 				},
 				"server": {
@@ -427,9 +427,9 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 				status = motion_detector.get_status()
 				health_status["motion"] = {
 					"enabled": True,
-					"currently_detecting": motion_detector.is_motion_active(),
-					"total_events": status['motion_event_count'],
-					"last_event_time": status['last_motion_time']
+					"currently_detecting": bool(motion_detector.is_motion_active()),
+					"total_events": int(status['motion_event_count']),
+					"last_event_time": float(status['last_motion_time']) if status['last_motion_time'] is not None else None
 				}
 			else:
 				health_status["motion"] = {
