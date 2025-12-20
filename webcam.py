@@ -32,6 +32,12 @@ frame_lock = threading.Lock()
 # Motion detector instance (None if disabled)
 motion_detector = None
 
+# Motion snapshot configuration
+MOTION_SNAPSHOT_ENABLED = False
+MOTION_SNAPSHOT_DIR = './snapshots'
+MOTION_SNAPSHOT_LIMIT = 0
+latest_snapshot_path = None  # Track most recent snapshot
+
 # Motion detection functions
 def compare_frames(frame1_bytes, frame2_bytes, threshold=5.0):
 	"""
@@ -77,6 +83,72 @@ def compare_frames(frame1_bytes, frame2_bytes, threshold=5.0):
 	except Exception as e:
 		logger.error(f"Frame comparison error: {e}")
 		return 0.0
+
+def save_motion_snapshot(frame_bytes):
+	"""
+	Save a motion detection snapshot to disk.
+
+	Args:
+		frame_bytes: JPEG frame to save
+
+	Returns:
+		Path to saved snapshot, or None if save failed
+	"""
+	global latest_snapshot_path
+
+	if not MOTION_SNAPSHOT_ENABLED or frame_bytes is None:
+		return None
+
+	try:
+		# Ensure snapshot directory exists
+		os.makedirs(MOTION_SNAPSHOT_DIR, exist_ok=True)
+
+		# Generate timestamp filename
+		from datetime import datetime
+		timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+		filename = f"motion_{timestamp}.jpg"
+		filepath = os.path.join(MOTION_SNAPSHOT_DIR, filename)
+
+		# Save snapshot
+		with open(filepath, 'wb') as f:
+			f.write(frame_bytes)
+
+		logger.info(f"Snapshot saved: {filepath}")
+		latest_snapshot_path = filepath
+
+		# Cleanup old snapshots if limit is set
+		if MOTION_SNAPSHOT_LIMIT > 0:
+			cleanup_old_snapshots()
+
+		return filepath
+
+	except Exception as e:
+		logger.error(f"Failed to save snapshot: {e}")
+		return None
+
+def cleanup_old_snapshots():
+	"""Remove oldest snapshots if limit exceeded"""
+	try:
+		# Get all snapshot files
+		snapshots = []
+		for filename in os.listdir(MOTION_SNAPSHOT_DIR):
+			if filename.startswith('motion_') and filename.endswith('.jpg'):
+				filepath = os.path.join(MOTION_SNAPSHOT_DIR, filename)
+				# Get file modification time
+				mtime = os.path.getmtime(filepath)
+				snapshots.append((mtime, filepath))
+
+		# Sort by modification time (oldest first)
+		snapshots.sort()
+
+		# Remove oldest files if we exceed the limit
+		while len(snapshots) > MOTION_SNAPSHOT_LIMIT:
+			_, filepath = snapshots.pop(0)
+			os.remove(filepath)
+			logger.debug(f"Removed old snapshot: {filepath}")
+
+	except Exception as e:
+		logger.error(f"Failed to cleanup old snapshots: {e}")
 
 # Motion detection state machine
 class MotionDetector:
@@ -215,6 +287,10 @@ def capture_loop():
 				if motion_detected:
 					status = motion_detector.get_status()
 					logger.info(f"Motion detected! Change: {change_pct:.2f}%, Event #{status['motion_event_count']}")
+
+					# Save snapshot if enabled
+					if MOTION_SNAPSHOT_ENABLED:
+						save_motion_snapshot(frame_bytes)
 				else:
 					# Log motion ended only when state changes from motion_detected to cooldown
 					status = motion_detector.get_status()
@@ -394,6 +470,12 @@ Examples:
 		help='Motion detection threshold percentage 0-100 (default: 5.0)')
 	parser.add_argument('--motion-cooldown', type=float, default=5.0,
 		help='Seconds between motion events (default: 5.0)')
+	parser.add_argument('--motion-snapshot', action='store_true',
+		help='Save snapshots when motion detected (default: disabled)')
+	parser.add_argument('--motion-snapshot-dir', default='./snapshots',
+		help='Directory for motion snapshots (default: ./snapshots)')
+	parser.add_argument('--motion-snapshot-limit', type=int, default=0,
+		help='Max snapshots to keep, 0=unlimited (default: 0)')
 
 	return parser.parse_args()
 
@@ -419,6 +501,7 @@ def initialize_camera(resolution_str, framerate):
 def main():
 	"""Main entry point"""
 	global HOST_NAME, PORT_NUMBER, AUTH_USER, AUTH_PASS, AUTH_ENABLED, motion_detector
+	global MOTION_SNAPSHOT_ENABLED, MOTION_SNAPSHOT_DIR, MOTION_SNAPSHOT_LIMIT
 
 	# Parse command-line arguments
 	args = parse_args()
@@ -455,6 +538,13 @@ def main():
 			cooldown_seconds=args.motion_cooldown
 		)
 		logger.info(f"Motion detection enabled: threshold={args.motion_threshold}%, cooldown={args.motion_cooldown}s")
+
+		# Configure motion snapshots
+		if args.motion_snapshot:
+			MOTION_SNAPSHOT_ENABLED = True
+			MOTION_SNAPSHOT_DIR = args.motion_snapshot_dir
+			MOTION_SNAPSHOT_LIMIT = args.motion_snapshot_limit
+			logger.info(f"Motion snapshots enabled: dir={MOTION_SNAPSHOT_DIR}, limit={MOTION_SNAPSHOT_LIMIT}")
 	else:
 		logger.info("Motion detection disabled")
 
