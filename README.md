@@ -31,7 +31,7 @@ python3 webcam.py --port 8080 --resolution 1280x720 --framerate 15
 python3 webcam.py --help
 ```
 
-Access at: `http://<raspberry-pi-ip>:8000/webcam.html`
+Access at: `http://pi-noir-camera.local:8000/webcam.html`
 
 ## Command-Line Options
 
@@ -133,17 +133,17 @@ python3 webcam.py --motion-detect \
 
 **Check motion status:**
 ```bash
-curl http://pi-camera.local:8000/health | jq '.motion'
+curl http://pi-noir-camera.local:8000/health | jq '.motion'
 ```
 
 **Get detailed motion information:**
 ```bash
-curl http://pi-camera.local:8000/motion/status | jq
+curl http://pi-noir-camera.local:8000/motion/status | jq
 ```
 
 **Download latest snapshot:**
 ```bash
-curl http://pi-camera.local:8000/motion/snapshot -o latest_motion.jpg
+curl http://pi-noir-camera.local:8000/motion/snapshot -o latest_motion.jpg
 ```
 
 ### Web UI Indicator
