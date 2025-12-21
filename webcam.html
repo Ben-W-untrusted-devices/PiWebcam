@@ -5,16 +5,66 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Pi NOIR Webcam</title>
 	<style>
+		:root {
+			--bg-primary: #0a0a0a;
+			--bg-secondary: #1a1a1a;
+			--bg-card: rgba(255, 255, 255, 0.05);
+			--text-primary: #ffffff;
+			--text-secondary: #aaaaaa;
+			--accent: #4CAF50;
+			--accent-hover: #45a049;
+			--danger: #f44336;
+			--warning: #ff9800;
+			--border: rgba(255, 255, 255, 0.1);
+		}
+
+		body.light-theme {
+			--bg-primary: #f5f5f5;
+			--bg-secondary: #ffffff;
+			--bg-card: rgba(0, 0, 0, 0.03);
+			--text-primary: #000000;
+			--text-secondary: #666666;
+			--accent: #4CAF50;
+			--accent-hover: #45a049;
+			--danger: #f44336;
+			--warning: #ff9800;
+			--border: rgba(0, 0, 0, 0.1);
+		}
+
+		* {
+			box-sizing: border-box;
+		}
+
 		body {
 			margin: 0;
 			padding: 20px;
-			background-color: black;
+			background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
 			display: flex;
 			flex-direction: column;
 			align-items: center;
 			justify-content: center;
 			min-height: 100vh;
-			font-family: Arial, sans-serif;
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+			color: var(--text-primary);
+			transition: background 0.3s ease, color 0.3s ease;
+		}
+
+		.card {
+			background: var(--bg-card);
+			backdrop-filter: blur(10px);
+			border-radius: 12px;
+			padding: 20px;
+			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+			border: 1px solid var(--border);
+			transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+		}
+
+		h1 {
+			font-weight: 300;
+			font-size: 2em;
+			margin: 0 0 20px 0;
+			letter-spacing: -1px;
+			text-align: center;
 		}
 
 		#webcamContainer {
@@ -22,33 +72,41 @@
 			flex-direction: column;
 			align-items: center;
 			margin-bottom: 20px;
+			position: relative;
+			overflow: hidden;
+			border-radius: 8px;
 		}
 
 		#webcamElement {
 			display: block;
-			transition: transform 0.3s ease;
+			transform-origin: center;
+			transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+			cursor: grab;
+		}
+
+		#webcamElement:active {
+			cursor: grabbing;
 		}
 
 		#webcamElement.rotate-n {
-			transform: rotate(0deg);
+			transform: rotate(0deg) scale(var(--zoom, 1));
 		}
 
 		#webcamElement.rotate-e {
-			transform: rotate(90deg);
+			transform: rotate(90deg) scale(var(--zoom, 1));
 		}
 
 		#webcamElement.rotate-s {
-			transform: rotate(180deg);
+			transform: rotate(180deg) scale(var(--zoom, 1));
 		}
 
 		#webcamElement.rotate-w {
-			transform: rotate(270deg);
+			transform: rotate(270deg) scale(var(--zoom, 1));
 		}
 
-		/* Reserve space for portrait rotations */
 		#webcamContainer.portrait {
-			width: 480px;  /* Canvas height becomes width when rotated */
-			height: 640px; /* Canvas width becomes height when rotated */
+			width: 480px;
+			height: 640px;
 		}
 
 		#webcamContainer.landscape {
@@ -56,91 +114,384 @@
 			height: 480px;
 		}
 
-		#controls {
+		.status-bar {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-top: 10px;
+			width: 100%;
+			font-size: 12px;
+			color: var(--text-secondary);
+		}
+
+		.status-item {
+			display: flex;
+			align-items: center;
+			gap: 5px;
+		}
+
+		.status-dot {
+			width: 8px;
+			height: 8px;
+			border-radius: 50%;
+			display: inline-block;
+		}
+
+		.status-dot.connected {
+			background: var(--accent);
+			box-shadow: 0 0 8px var(--accent);
+			animation: pulse-dot 2s infinite;
+		}
+
+		.status-dot.disconnected {
+			background: var(--danger);
+		}
+
+		@keyframes pulse-dot {
+			0%, 100% { opacity: 1; }
+			50% { opacity: 0.5; }
+		}
+
+		.controls-group {
 			display: flex;
 			gap: 10px;
+			flex-wrap: wrap;
+			justify-content: center;
+			margin: 10px 0;
 		}
 
 		button {
-			padding: 10px 20px;
-			font-size: 16px;
+			padding: 10px 16px;
+			font-size: 14px;
 			cursor: pointer;
-			background-color: #333;
-			color: white;
-			border: 2px solid #555;
-			border-radius: 5px;
-			transition: background-color 0.2s;
+			background: var(--bg-card);
+			color: var(--text-primary);
+			border: 1px solid var(--border);
+			border-radius: 8px;
+			transition: all 0.2s ease;
+			font-weight: 500;
+			display: flex;
+			align-items: center;
+			gap: 6px;
 		}
 
 		button:hover {
-			background-color: #555;
+			background: rgba(255, 255, 255, 0.1);
+			transform: translateY(-1px);
+			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 		}
 
 		button:active {
-			background-color: #666;
+			transform: translateY(0);
 		}
 
 		button.active {
-			background-color: #666;
-			border-color: #888;
+			background: var(--accent);
+			border-color: var(--accent);
+			color: white;
+		}
+
+		button.icon-only {
+			padding: 10px;
+			min-width: 40px;
 		}
 
 		#motionIndicator {
-			background-color: #333;
-			color: white;
-			padding: 10px 20px;
+			background: var(--bg-card);
+			color: var(--text-primary);
+			padding: 12px 20px;
 			margin: 10px 0;
-			border-radius: 5px;
+			border-radius: 8px;
 			font-size: 14px;
 			display: none;
+			border: 1px solid var(--border);
+			font-weight: 500;
 		}
 
 		#motionIndicator.motion-active {
 			display: block;
-			background-color: #f44336;
+			background: var(--danger);
+			color: white;
+			border-color: var(--danger);
 			animation: pulse 1s infinite;
 		}
 
 		@keyframes pulse {
-			0%, 100% { opacity: 1; }
-			50% { opacity: 0.7; }
+			0%, 100% { opacity: 1; transform: scale(1); }
+			50% { opacity: 0.9; transform: scale(1.02); }
 		}
 
 		#motionIndicator.motion-enabled {
 			display: block;
-			background-color: #444;
-			color: #aaa;
+		}
+
+		#settingsPanel {
+			margin-top: 20px;
+			background: var(--bg-card);
+			border: 1px solid var(--border);
+			border-radius: 8px;
+			padding: 0;
+			max-height: 0;
+			overflow: hidden;
+			transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+			opacity: 0;
+		}
+
+		#settingsPanel.open {
+			max-height: 300px;
+			padding: 20px;
+			opacity: 1;
+		}
+
+		.setting-item {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 12px 0;
+			border-bottom: 1px solid var(--border);
+			font-size: 14px;
+		}
+
+		.setting-item:last-child {
+			border-bottom: none;
+		}
+
+		/* Toggle Switch */
+		.toggle-switch {
+			position: relative;
+			display: inline-block;
+			width: 48px;
+			height: 24px;
+		}
+
+		.toggle-switch input {
+			opacity: 0;
+			width: 0;
+			height: 0;
+		}
+
+		.slider {
+			position: absolute;
+			cursor: pointer;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background-color: rgba(255, 255, 255, 0.1);
+			transition: 0.3s;
+			border-radius: 24px;
+			border: 1px solid var(--border);
+		}
+
+		.slider:before {
+			position: absolute;
+			content: "";
+			height: 16px;
+			width: 16px;
+			left: 3px;
+			bottom: 3px;
+			background-color: var(--text-secondary);
+			transition: 0.3s;
+			border-radius: 50%;
+		}
+
+		input:checked + .slider {
+			background-color: var(--accent);
+			border-color: var(--accent);
+		}
+
+		input:checked + .slider:before {
+			transform: translateX(24px);
+			background-color: white;
+		}
+
+		/* Theme toggle button in settings */
+		.theme-toggle {
+			padding: 6px 12px;
+			min-width: 100px;
+			justify-content: center;
+		}
+
+		#shortcuts {
+			font-size: 11px;
+			color: var(--text-secondary);
+			margin-top: 15px;
+			text-align: center;
+			line-height: 1.6;
+		}
+
+		/* Responsive design */
+		@media (max-width: 768px) {
+			body {
+				padding: 10px;
+			}
+
+			#webcamContainer.landscape,
+			#webcamContainer.portrait {
+				width: 100%;
+				max-width: 100vw;
+			}
+
+			#webcamElement {
+				max-width: 100%;
+				height: auto;
+			}
+
+			.controls-group {
+				width: 100%;
+			}
+
+			button {
+				flex: 1;
+				min-width: 0;
+			}
+
+			h1 {
+				font-size: 1.5em;
+			}
+		}
+
+		/* Fullscreen mode */
+		:fullscreen {
+			background: black;
+		}
+
+		:-webkit-full-screen {
+			background: black;
+		}
+
+		:-moz-full-screen {
+			background: black;
 		}
 	</style>
 </head>
 <body>
-	<div id="webcamContainer">
-		<canvas id="webcamElement" width="640" height="480" role="img" aria-label="Live webcam feed"></canvas>
-		<div id="status" style="color: white; margin-top: 10px; font-size: 14px;" role="status" aria-live="polite">Connecting...</div>
-	</div>
-	<div id="motionIndicator" role="status" aria-live="polite">Motion Detection: Idle</div>
-	<div id="controls">
-		<button id="btn-n" onclick="setRotation('N')">N (0°)</button>
-		<button id="btn-e" onclick="setRotation('E')">E (90°)</button>
-		<button id="btn-s" onclick="setRotation('S')">S (180°)</button>
-		<button id="btn-w" onclick="setRotation('W')">W (270°)</button>
+	<div class="card" style="max-width: 800px;">
+		<h1>Pi NOIR Webcam</h1>
+
+		<div id="webcamContainer">
+			<canvas id="webcamElement" width="640" height="480" role="img" aria-label="Live webcam feed"></canvas>
+			<div class="status-bar">
+				<div class="status-item">
+					<span class="status-dot" id="connectionDot"></span>
+					<span id="status">Connecting...</span>
+				</div>
+				<div class="status-item">
+					<span id="fps">-- FPS</span>
+				</div>
+				<div class="status-item">
+					<span id="quality">--</span>
+				</div>
+			</div>
+		</div>
+
+		<div id="motionIndicator" role="status" aria-live="polite">Motion Detection: Idle</div>
+
+		<!-- View Controls: Rotation & Zoom -->
+		<div class="controls-group">
+			<button id="btn-n" onclick="setRotation('N')" title="Rotate 0°">
+				<span>↑</span> 0°
+			</button>
+			<button id="btn-e" onclick="setRotation('E')" title="Rotate 90°">
+				<span>→</span> 90°
+			</button>
+			<button id="btn-s" onclick="setRotation('S')" title="Rotate 180°">
+				<span>↓</span> 180°
+			</button>
+			<button id="btn-w" onclick="setRotation('W')" title="Rotate 270°">
+				<span>←</span> 270°
+			</button>
+			<span style="width: 20px; border-left: 1px solid var(--border);"></span>
+			<button onclick="adjustZoom(-0.2)" title="Zoom Out (-)">
+				<span>−</span>
+			</button>
+			<button onclick="resetZoom()" title="Reset Zoom (0)">
+				<span>⊙</span>
+			</button>
+			<button onclick="adjustZoom(0.2)" title="Zoom In (+)">
+				<span>+</span>
+			</button>
+		</div>
+
+		<!-- Action Controls -->
+		<div class="controls-group">
+			<button onclick="toggleFullscreen()" title="Toggle Fullscreen (F)">
+				<span>⛶</span> Fullscreen
+			</button>
+			<button id="downloadBtn" onclick="downloadSnapshot()" title="Download Snapshot (S)" style="display:none;">
+				<span>📷</span> Download
+			</button>
+			<button id="pipBtn" onclick="togglePiP()" title="Picture-in-Picture (P)" style="display:none;">
+				<span>⧉</span> PiP
+			</button>
+			<button onclick="toggleSettings()" title="Settings">
+				<span>⚙️</span> Settings
+			</button>
+		</div>
+
+		<!-- Settings Panel -->
+		<div id="settingsPanel">
+			<div class="setting-item">
+				<span>Theme</span>
+				<button onclick="toggleTheme()" class="theme-toggle" title="Toggle Theme (T)">
+					<span id="themeIcon">🌓</span>
+					<span id="themeName">Dark</span>
+				</button>
+			</div>
+			<div class="setting-item">
+				<span>Show FPS Counter</span>
+				<label class="toggle-switch">
+					<input type="checkbox" id="showFps" checked onchange="toggleFpsDisplay()">
+					<span class="slider"></span>
+				</label>
+			</div>
+			<div class="setting-item">
+				<span>Show Connection Quality</span>
+				<label class="toggle-switch">
+					<input type="checkbox" id="showQuality" checked onchange="toggleQualityDisplay()">
+					<span class="slider"></span>
+				</label>
+			</div>
+		</div>
+
+		<!-- Keyboard Shortcuts -->
+		<div id="shortcuts">
+			<strong>Keyboard Shortcuts:</strong> F=Fullscreen | S=Download | P=PiP | T=Theme | +/-=Zoom | 0=Reset Zoom | ←→=Rotate
+		</div>
 	</div>
 	<script>
-		// Read rotation from URL parameter
+		// State variables
 		const urlParams = new URLSearchParams(window.location.search);
 		let currentRotation = (urlParams.get('rotation') || 'N').toUpperCase();
+		let currentZoom = 1.0;
+		let frameCount = 0;
+		let lastFpsUpdate = Date.now();
+		let lastFrameTime = Date.now();
+		let motionEnabled = false;
 
 		// Validate rotation parameter
 		if (!['N', 'E', 'S', 'W'].includes(currentRotation)) {
 			currentRotation = 'N';
 		}
 
+		// Load theme from localStorage
+		const savedTheme = localStorage.getItem('theme');
+		if (savedTheme === 'light') {
+			document.body.classList.add('light-theme');
+			document.getElementById('themeIcon').textContent = '☀️';
+			document.getElementById('themeName').textContent = 'Light';
+		}
+
+		// Detect Picture-in-Picture support
+		if ('pictureInPictureEnabled' in document) {
+			document.getElementById('pipBtn').style.display = '';
+		}
+
+		// === ROTATION ===
 		function setRotation(direction) {
-			// Update URL without reloading page
 			const newUrl = new URL(window.location);
 			newUrl.searchParams.set('rotation', direction);
 			window.history.pushState({}, '', newUrl);
-
 			currentRotation = direction;
 			applyRotation();
 		}
@@ -149,66 +500,181 @@
 			const webcamElement = document.getElementById("webcamElement");
 			const webcamContainer = document.getElementById("webcamContainer");
 
-			// Remove all rotation classes
 			webcamElement.classList.remove('rotate-n', 'rotate-e', 'rotate-s', 'rotate-w');
 			webcamContainer.classList.remove('portrait', 'landscape');
-
-			// Add current rotation class
 			webcamElement.classList.add('rotate-' + currentRotation.toLowerCase());
 
-			// Set container size based on orientation
 			if (currentRotation === 'E' || currentRotation === 'W') {
 				webcamContainer.classList.add('portrait');
 			} else {
 				webcamContainer.classList.add('landscape');
 			}
 
-			// Update button states
-			document.querySelectorAll('#controls button').forEach(btn => {
+			document.querySelectorAll('#btn-n, #btn-e, #btn-s, #btn-w').forEach(btn => {
 				btn.classList.remove('active');
 				btn.setAttribute('aria-pressed', 'false');
 			});
 			const activeBtn = document.getElementById('btn-' + currentRotation.toLowerCase());
-			activeBtn.classList.add('active');
-			activeBtn.setAttribute('aria-pressed', 'true');
+			if (activeBtn) {
+				activeBtn.classList.add('active');
+				activeBtn.setAttribute('aria-pressed', 'true');
+			}
 		}
 
+		// === ZOOM ===
+		function adjustZoom(delta) {
+			currentZoom = Math.max(0.5, Math.min(4.0, currentZoom + delta));
+			updateZoom();
+		}
+
+		function resetZoom() {
+			currentZoom = 1.0;
+			updateZoom();
+		}
+
+		function updateZoom() {
+			document.documentElement.style.setProperty('--zoom', currentZoom);
+		}
+
+		// Mouse wheel zoom
+		document.getElementById('webcamElement').addEventListener('wheel', (e) => {
+			if (e.ctrlKey || e.metaKey) {
+				e.preventDefault();
+				adjustZoom(e.deltaY * -0.001);
+			}
+		});
+
+		// === FULLSCREEN ===
+		function toggleFullscreen() {
+			if (!document.fullscreenElement) {
+				document.documentElement.requestFullscreen();
+			} else {
+				document.exitFullscreen();
+			}
+		}
+
+		// === PICTURE-IN-PICTURE ===
+		async function togglePiP() {
+			try {
+				const canvas = document.getElementById('webcamElement');
+				const stream = canvas.captureStream(30);
+				const video = document.createElement('video');
+				video.srcObject = stream;
+				video.muted = true;
+				await video.play();
+				await video.requestPictureInPicture();
+			} catch (err) {
+				console.error('PiP failed:', err);
+				alert('Picture-in-Picture not supported in this browser');
+			}
+		}
+
+		// === THEME ===
+		function toggleTheme() {
+			const isLight = document.body.classList.toggle('light-theme');
+			localStorage.setItem('theme', isLight ? 'light' : 'dark');
+			document.getElementById('themeIcon').textContent = isLight ? '☀️' : '🌓';
+			document.getElementById('themeName').textContent = isLight ? 'Light' : 'Dark';
+		}
+
+		// === SETTINGS ===
+		function toggleSettings() {
+			document.getElementById('settingsPanel').classList.toggle('open');
+		}
+
+		function toggleFpsDisplay() {
+			const show = document.getElementById('showFps').checked;
+			document.getElementById('fps').style.display = show ? '' : 'none';
+		}
+
+		function toggleQualityDisplay() {
+			const show = document.getElementById('showQuality').checked;
+			document.getElementById('quality').style.display = show ? '' : 'none';
+		}
+
+		// === SNAPSHOT DOWNLOAD ===
+		function downloadSnapshot() {
+			fetch('motion/snapshot')
+				.then(r => {
+					if (!r.ok) throw new Error('No snapshot available');
+					return r.blob();
+				})
+				.then(blob => {
+					const url = URL.createObjectURL(blob);
+					const a = document.createElement('a');
+					a.href = url;
+					a.download = `snapshot_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+					a.click();
+					URL.revokeObjectURL(url);
+				})
+				.catch(err => {
+					console.error('Download failed:', err);
+					alert('No snapshot available. Enable motion detection with --motion-snapshot');
+				});
+		}
+
+		// === WEBCAM REFRESH ===
 		function refreshWebcamPixels() {
-			let webcamURL = "webcam.jpg?t=" + (new Date()).getTime();
+			const webcamURL = "webcam.jpg?t=" + (new Date()).getTime();
+			const webcamElement = document.getElementById("webcamElement");
+			const context = webcamElement.getContext("2d");
+			const statusElement = document.getElementById('status');
+			const connectionDot = document.getElementById('connectionDot');
 
-			let webcamElement = document.getElementById("webcamElement");
-			let context = webcamElement.getContext("2d");
+			const nextWebcamImage = new Image();
+			const loadStart = Date.now();
 
-			let nextWebcamImage = new Image();
 			nextWebcamImage.onload = function() {
 				context.drawImage(nextWebcamImage, 0, 0);
-				document.getElementById('status').textContent = 'Connected';
-				document.getElementById('status').style.color = '#4CAF50';
+
+				// Update connection status
+				statusElement.textContent = 'Connected';
+				connectionDot.className = 'status-dot connected';
+
+				// Update FPS counter
+				frameCount++;
+				if (Date.now() - lastFpsUpdate > 1000) {
+					document.getElementById('fps').textContent = `${frameCount} FPS`;
+					frameCount = 0;
+					lastFpsUpdate = Date.now();
+				}
+
+				// Update quality indicator
+				const latency = Date.now() - loadStart;
+				const quality = latency < 50 ? 'Excellent' :
+				                latency < 100 ? 'Good' :
+				                latency < 200 ? 'Fair' : 'Poor';
+				document.getElementById('quality').textContent = quality;
+
 				setTimeout(refreshWebcamPixels, 1000/30);
-			}
+			};
+
 			nextWebcamImage.onerror = function() {
 				console.error("Failed to load webcam image, retrying...");
-				document.getElementById('status').textContent = 'Connection lost, retrying...';
-				document.getElementById('status').style.color = '#ff9800';
+				statusElement.textContent = 'Reconnecting...';
+				connectionDot.className = 'status-dot disconnected';
 				setTimeout(refreshWebcamPixels, 1000);
-			}
+			};
+
 			nextWebcamImage.src = webcamURL;
 		}
 
-		// Motion detection polling
+		// === MOTION DETECTION ===
 		function updateMotionStatus() {
 			fetch('health')
 				.then(response => response.json())
 				.then(data => {
 					const motionIndicator = document.getElementById('motionIndicator');
+					const downloadBtn = document.getElementById('downloadBtn');
 
 					if (data.motion && data.motion.enabled) {
+						motionEnabled = true;
+						downloadBtn.style.display = '';  // Show download button
+
 						if (data.motion.currently_detecting) {
-							// Motion is being detected
 							motionIndicator.className = 'motion-active';
-							motionIndicator.textContent = 'Motion Detected!';
+							motionIndicator.textContent = '🔴 Motion Detected!';
 						} else {
-							// Motion detection enabled but idle
 							motionIndicator.className = 'motion-enabled';
 							const totalEvents = data.motion.total_events || 0;
 							if (data.motion.last_event_time) {
@@ -219,8 +685,8 @@
 							}
 						}
 					} else {
-						// Motion detection disabled
 						motionIndicator.style.display = 'none';
+						downloadBtn.style.display = 'none';  // Hide download button
 					}
 				})
 				.catch(error => {
@@ -228,13 +694,73 @@
 				});
 		}
 
-		// Apply initial rotation from URL
+		// === KEYBOARD SHORTCUTS ===
+		document.addEventListener('keydown', (e) => {
+			// Don't trigger shortcuts if user is typing in an input
+			if (e.target.tagName === 'INPUT') return;
+
+			switch(e.key.toLowerCase()) {
+				case 'f':
+					e.preventDefault();
+					toggleFullscreen();
+					break;
+				case 's':
+					if (motionEnabled) {
+						e.preventDefault();
+						downloadSnapshot();
+					}
+					break;
+				case 'p':
+					e.preventDefault();
+					togglePiP();
+					break;
+				case 't':
+					e.preventDefault();
+					toggleTheme();
+					break;
+				case '+':
+				case '=':
+					e.preventDefault();
+					adjustZoom(0.2);
+					break;
+				case '-':
+				case '_':
+					e.preventDefault();
+					adjustZoom(-0.2);
+					break;
+				case '0':
+					e.preventDefault();
+					resetZoom();
+					break;
+				case 'arrowleft':
+					e.preventDefault();
+					rotateLeft();
+					break;
+				case 'arrowright':
+					e.preventDefault();
+					rotateRight();
+					break;
+			}
+		});
+
+		function rotateLeft() {
+			const rotations = ['N', 'W', 'S', 'E'];
+			const currentIndex = rotations.indexOf(currentRotation);
+			const newRotation = rotations[(currentIndex + 1) % 4];
+			setRotation(newRotation);
+		}
+
+		function rotateRight() {
+			const rotations = ['N', 'E', 'S', 'W'];
+			const currentIndex = rotations.indexOf(currentRotation);
+			const newRotation = rotations[(currentIndex + 1) % 4];
+			setRotation(newRotation);
+		}
+
+		// === INITIALIZATION ===
 		applyRotation();
-
-		// Start the refresh cycle
+		updateZoom();
 		refreshWebcamPixels();
-
-		// Poll motion status every 2 seconds
 		updateMotionStatus();
 		setInterval(updateMotionStatus, 2000);
 	</script>
