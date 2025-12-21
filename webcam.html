@@ -67,14 +67,18 @@
 			text-align: center;
 		}
 
+		.video-wrapper {
+			margin-bottom: 20px;
+		}
+
 		#webcamContainer {
 			display: flex;
-			flex-direction: column;
 			align-items: center;
-			margin-bottom: 20px;
+			justify-content: center;
 			position: relative;
-			overflow: hidden;
 			border-radius: 8px;
+			background: rgba(0, 0, 0, 0.3);
+			overflow: visible;
 		}
 
 		#webcamElement {
@@ -118,10 +122,12 @@
 			display: flex;
 			justify-content: space-between;
 			align-items: center;
-			margin-top: 10px;
+			margin-top: 15px;
+			padding: 10px 0;
 			width: 100%;
 			font-size: 12px;
 			color: var(--text-secondary);
+			border-top: 1px solid var(--border);
 		}
 
 		.status-item {
@@ -326,15 +332,25 @@
 				padding: 10px;
 			}
 
+			.video-wrapper {
+				width: 100%;
+			}
+
 			#webcamContainer.landscape,
 			#webcamContainer.portrait {
-				width: 100%;
+				width: 100% !important;
+				height: auto !important;
 				max-width: 100vw;
 			}
 
 			#webcamElement {
 				max-width: 100%;
+				width: 100%;
 				height: auto;
+			}
+
+			.status-bar {
+				font-size: 11px;
 			}
 
 			.controls-group {
@@ -344,6 +360,8 @@
 			button {
 				flex: 1;
 				min-width: 0;
+				font-size: 12px;
+				padding: 8px 12px;
 			}
 
 			h1 {
@@ -369,8 +387,10 @@
 	<div class="card" style="max-width: 800px;">
 		<h1>Pi NOIR Webcam</h1>
 
-		<div id="webcamContainer">
-			<canvas id="webcamElement" width="640" height="480" role="img" aria-label="Live webcam feed"></canvas>
+		<div class="video-wrapper">
+			<div id="webcamContainer">
+				<canvas id="webcamElement" width="640" height="480" role="img" aria-label="Live webcam feed"></canvas>
+			</div>
 			<div class="status-bar">
 				<div class="status-item">
 					<span class="status-dot" id="connectionDot"></span>
@@ -482,8 +502,9 @@
 			document.getElementById('themeName').textContent = 'Light';
 		}
 
-		// Detect Picture-in-Picture support
-		if ('pictureInPictureEnabled' in document) {
+		// Detect Picture-in-Picture support (requires both PiP API and canvas.captureStream)
+		const canvas = document.getElementById('webcamElement');
+		if ('pictureInPictureEnabled' in document && typeof canvas.captureStream === 'function') {
 			document.getElementById('pipBtn').style.display = '';
 		}
 
