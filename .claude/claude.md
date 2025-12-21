@@ -16,6 +16,13 @@ When working on this codebase:
 - **When you resolve an issue:** Add to `CHANGELOG.md` and remove from `ISSUES.md`
 - Check `CHANGELOG.md` to see what's already been completed
 
+## Documentation Guidelines
+
+**DO NOT include dates in documentation:**
+- Never add dates (e.g., "December 2024") to `CHANGELOG.md`, `ISSUES.md`, or other documentation
+- Git commit history provides accurate timestamps
+- Including dates in documentation causes maintenance issues and errors
+
 ## Project Overview
 
 PiWebcam is a simple Raspberry Pi camera streaming application consisting of:

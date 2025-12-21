@@ -159,7 +159,7 @@ test_motion_event_counter - PASS
 
 ---
 
-### Optional Dependencies with Graceful Degradation (December 2024)
+### Optional Dependencies with Graceful Degradation
 **Priority:** Medium | **Complexity:** Medium
 
 Made PIL (Pillow) and numpy dependencies optional with graceful degradation:
@@ -199,7 +199,7 @@ INFO - Server started at http://0.0.0.0:8000
 
 ---
 
-### JSON Serialization Fix for PiCamera Objects (December 2024)
+### JSON Serialization Fix for PiCamera Objects
 **Priority:** High | **Complexity:** Low
 
 Fixed crash in /health endpoint caused by non-JSON-serializable PiCamera objects:
