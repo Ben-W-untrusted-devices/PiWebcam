@@ -93,70 +93,38 @@ def compare_frames(frame1_bytes, frame2_bytes, threshold=5.0):
 
 def save_motion_snapshot(frame_bytes):
 	"""
-	Save a motion detection snapshot to disk.
+	Save a motion detection snapshot to RAM (in-memory storage).
 
 	Args:
 		frame_bytes: JPEG frame to save
 
 	Returns:
-		Path to saved snapshot, or None if save failed
+		Timestamp of saved snapshot, or None if save failed
 	"""
-	global latest_snapshot_path
+	global snapshot_history
 
 	if not MOTION_SNAPSHOT_ENABLED or frame_bytes is None:
 		return None
 
 	try:
-		# Ensure snapshot directory exists
-		os.makedirs(MOTION_SNAPSHOT_DIR, exist_ok=True)
+		import time
+		timestamp = time.time()
 
-		# Generate timestamp filename
-		from datetime import datetime
-		timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-		filename = f"motion_{timestamp}.jpg"
-		filepath = os.path.join(MOTION_SNAPSHOT_DIR, filename)
-
-		# Save snapshot
-		with open(filepath, 'wb') as f:
-			f.write(frame_bytes)
-
-		logger.info(f"Snapshot saved: {filepath}")
+		# Thread-safe append to snapshot history
 		with snapshot_lock:
-			latest_snapshot_path = filepath
+			snapshot_history.append((timestamp, frame_bytes))
 
-		# Cleanup old snapshots if limit is set
-		if MOTION_SNAPSHOT_LIMIT > 0:
-			cleanup_old_snapshots()
+			# Cleanup old snapshots if limit is set
+			if MOTION_SNAPSHOT_LIMIT > 0 and len(snapshot_history) > MOTION_SNAPSHOT_LIMIT:
+				# Remove oldest snapshots
+				snapshot_history = snapshot_history[-MOTION_SNAPSHOT_LIMIT:]
 
-		return filepath
+		logger.info(f"Snapshot saved to RAM: {len(frame_bytes)} bytes, total snapshots: {len(snapshot_history)}")
+		return timestamp
 
 	except Exception as e:
 		logger.error(f"Failed to save snapshot: {e}")
 		return None
-
-def cleanup_old_snapshots():
-	"""Remove oldest snapshots if limit exceeded"""
-	try:
-		# Get all snapshot files
-		snapshots = []
-		for filename in os.listdir(MOTION_SNAPSHOT_DIR):
-			if filename.startswith('motion_') and filename.endswith('.jpg'):
-				filepath = os.path.join(MOTION_SNAPSHOT_DIR, filename)
-				# Get file modification time
-				mtime = os.path.getmtime(filepath)
-				snapshots.append((mtime, filepath))
-
-		# Sort by modification time (oldest first)
-		snapshots.sort()
-
-		# Remove oldest files if we exceed the limit
-		while len(snapshots) > MOTION_SNAPSHOT_LIMIT:
-			_, filepath = snapshots.pop(0)
-			os.remove(filepath)
-			logger.debug(f"Removed old snapshot: {filepath}")
-
-	except Exception as e:
-		logger.error(f"Failed to cleanup old snapshots: {e}")
 
 # Motion detection state machine
 class MotionDetector:
@@ -451,9 +419,10 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 
 			status = motion_detector.get_status()
 
-			# Thread-safe read of snapshot path
+			# Thread-safe read of snapshot history
 			with snapshot_lock:
-				snapshot_path = latest_snapshot_path
+				snapshot_count = len(snapshot_history)
+				latest_timestamp = snapshot_history[-1][0] if snapshot_history else None
 
 			motion_status = {
 				"enabled": True,
@@ -468,9 +437,10 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 				},
 				"snapshot": {
 					"enabled": MOTION_SNAPSHOT_ENABLED,
-					"directory": MOTION_SNAPSHOT_DIR if MOTION_SNAPSHOT_ENABLED else None,
+					"storage": "RAM (in-memory)",
+					"count": snapshot_count,
 					"limit": MOTION_SNAPSHOT_LIMIT if MOTION_SNAPSHOT_ENABLED else None,
-					"latest": snapshot_path
+					"latest_timestamp": latest_timestamp
 				}
 			}
 
@@ -486,25 +456,22 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 				self.wfile.write(b"Motion detection not enabled")
 				return
 
-			# Thread-safe read of snapshot path
+			# Thread-safe read of latest snapshot from RAM
 			with snapshot_lock:
-				snapshot_path = latest_snapshot_path
+				if snapshot_history:
+					latest_snapshot = snapshot_history[-1][1]  # Get bytes from (timestamp, bytes) tuple
+				else:
+					latest_snapshot = None
 
-			if not MOTION_SNAPSHOT_ENABLED or snapshot_path is None:
+			if not MOTION_SNAPSHOT_ENABLED or latest_snapshot is None:
 				self.sendHeader(response=404, contentType="text/plain")
 				self.wfile.write(b"No snapshot available")
 				return
 
-			try:
-				with open(snapshot_path, 'rb') as f:
-					snapshot_data = f.read()
-				self.sendHeader(contentType="image/jpeg")
-				self.wfile.write(snapshot_data)
-				return
-			except (FileNotFoundError, IOError):
-				self.sendHeader(response=404, contentType="text/plain")
-				self.wfile.write(b"Snapshot file not found")
-				return
+			# Serve snapshot directly from RAM
+			self.sendHeader(contentType="image/jpeg")
+			self.wfile.write(latest_snapshot)
+			return
 
 		# Handle other file requests (like webcam.html)
 		try:
@@ -568,11 +535,9 @@ Examples:
 	parser.add_argument('--motion-cooldown', type=float, default=5.0,
 		help='Seconds between motion events (default: 5.0)')
 	parser.add_argument('--motion-snapshot', action='store_true',
-		help='Save snapshots when motion detected (default: disabled)')
-	parser.add_argument('--motion-snapshot-dir', default='./snapshots',
-		help='Directory for motion snapshots (default: ./snapshots)')
+		help='Save snapshots to RAM when motion detected (default: disabled)')
 	parser.add_argument('--motion-snapshot-limit', type=int, default=0,
-		help='Max snapshots to keep, 0=unlimited (default: 0)')
+		help='Max snapshots to keep in RAM, 0=unlimited (default: 0)')
 
 	return parser.parse_args()
 
@@ -613,7 +578,7 @@ def initialize_camera(resolution_str, framerate):
 def main():
 	"""Main entry point"""
 	global HOST_NAME, PORT_NUMBER, AUTH_USER, AUTH_PASS, AUTH_ENABLED, motion_detector
-	global MOTION_SNAPSHOT_ENABLED, MOTION_SNAPSHOT_DIR, MOTION_SNAPSHOT_LIMIT
+	global MOTION_SNAPSHOT_ENABLED, MOTION_SNAPSHOT_LIMIT
 
 	# Parse command-line arguments
 	args = parse_args()
@@ -666,40 +631,16 @@ def main():
 		)
 		logger.info(f"Motion detection enabled: threshold={args.motion_threshold}%, cooldown={args.motion_cooldown}s")
 
-		# Configure motion snapshots
+		# Configure motion snapshots (in-memory storage)
 		if args.motion_snapshot:
-			# Validate snapshot directory is safe
-			snapshot_dir = os.path.abspath(args.motion_snapshot_dir)
-			unsafe_prefixes = ['/etc', '/root', '/sys', '/proc', '/boot']
-			if any(snapshot_dir.startswith(prefix) for prefix in unsafe_prefixes):
-				logger.error(f"Unsafe snapshot directory: {snapshot_dir}")
-				logger.error(f"Cannot write to system directories: {', '.join(unsafe_prefixes)}")
-				sys.exit(1)
-
 			# Validate snapshot limit is non-negative
 			if args.motion_snapshot_limit < 0:
 				logger.error(f"Snapshot limit must be >= 0, got {args.motion_snapshot_limit}")
 				sys.exit(1)
 
-			# Check if snapshot directory is on tmpfs (RAM) to avoid flash writes
-			try:
-				import subprocess
-				result = subprocess.run(['stat', '-f', '-c', '%T', snapshot_dir],
-				                       capture_output=True, text=True, timeout=2)
-				if result.returncode == 0:
-					fs_type = result.stdout.strip()
-					if fs_type != 'tmpfs':
-						logger.warning(f"Snapshot directory '{snapshot_dir}' is on {fs_type}, not tmpfs (RAM)")
-						logger.warning("This will write to flash storage and may wear out SD card")
-						logger.warning("Consider using tmpfs: mount -t tmpfs -o size=100M tmpfs /tmp/snapshots")
-			except Exception:
-				# stat command failed or not available, skip check
-				pass
-
 			MOTION_SNAPSHOT_ENABLED = True
-			MOTION_SNAPSHOT_DIR = snapshot_dir
 			MOTION_SNAPSHOT_LIMIT = args.motion_snapshot_limit
-			logger.info(f"Motion snapshots enabled: dir={MOTION_SNAPSHOT_DIR}, limit={MOTION_SNAPSHOT_LIMIT}")
+			logger.info(f"Motion snapshots enabled: storage=RAM, limit={MOTION_SNAPSHOT_LIMIT if MOTION_SNAPSHOT_LIMIT > 0 else 'unlimited'}")
 	else:
 		logger.info("Motion detection disabled")
 

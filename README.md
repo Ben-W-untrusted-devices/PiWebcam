@@ -50,9 +50,8 @@ Access at: `http://pi-noir-camera.local:8000/webcam.html`
 --motion-detect                Enable motion detection (default: disabled)
 --motion-threshold PCT         Motion threshold 0-100% (default: 5.0)
 --motion-cooldown SECS         Seconds between motion events (default: 5.0)
---motion-snapshot              Save snapshots when motion detected (default: disabled)
---motion-snapshot-dir DIR      Snapshot directory (default: ./snapshots)
---motion-snapshot-limit N      Max snapshots to keep, 0=unlimited (default: 0)
+--motion-snapshot              Save snapshots to RAM when motion detected (default: disabled)
+--motion-snapshot-limit N      Max snapshots to keep in RAM, 0=unlimited (default: 0)
 ```
 
 **Example with logging:**
@@ -93,7 +92,7 @@ python3 webcam.py --motion-detect
 # Sensitive detection for low-light environments
 python3 webcam.py --motion-detect --motion-threshold 3
 
-# With snapshot saving (keeps last 100 snapshots)
+# With snapshot saving in RAM (keeps last 100 snapshots)
 python3 webcam.py --motion-detect --motion-snapshot --motion-snapshot-limit 100
 
 # Full example with custom settings
@@ -101,7 +100,6 @@ python3 webcam.py --motion-detect \
   --motion-threshold 4.0 \
   --motion-cooldown 10 \
   --motion-snapshot \
-  --motion-snapshot-dir /var/snapshots \
   --motion-snapshot-limit 50
 ```
 
@@ -124,35 +122,12 @@ python3 webcam.py --motion-detect \
 - Set higher to reduce snapshot/notification spam
 
 **Snapshots** (`--motion-snapshot`)
-- Saves JPEG when motion first detected
-- Filename format: `motion_YYYYMMDD_HHMMSS.jpg`
-- Use `--motion-snapshot-limit` to auto-delete old snapshots
-- Set to 0 for unlimited (disk space permitting)
-
-**RAM-Only Operation (Recommended for SD Card Longevity)**
-
-To avoid wearing out the SD card with continuous writes, use tmpfs (RAM disk) for snapshots:
-
-```bash
-# Create tmpfs mount for snapshots (100MB, lost on reboot)
-sudo mkdir -p /tmp/snapshots
-sudo mount -t tmpfs -o size=100M tmpfs /tmp/snapshots
-
-# Run with snapshots in RAM
-python3 webcam.py --motion-detect --motion-snapshot \
-  --motion-snapshot-dir /tmp/snapshots \
-  --motion-snapshot-limit 50
-
-# Make tmpfs persistent across reboots (add to /etc/fstab)
-echo "tmpfs /tmp/snapshots tmpfs defaults,size=100M,mode=1777 0 0" | sudo tee -a /etc/fstab
-```
-
-The application will warn if snapshots are configured on non-tmpfs storage:
-```
-WARNING - Snapshot directory '/home/pi/snapshots' is on ext4, not tmpfs (RAM)
-WARNING - This will write to flash storage and may wear out SD card
-WARNING - Consider using tmpfs: mount -t tmpfs -o size=100M tmpfs /tmp/snapshots
-```
+- Saves JPEG to RAM when motion first detected
+- Stored in-memory (no SD card writes)
+- Use `--motion-snapshot-limit` to control memory usage
+- Set to 0 for unlimited (memory permitting)
+- Snapshots lost on restart (by design - protects SD card)
+- Access via `/motion/snapshot` endpoint
 
 ### API Usage
 
@@ -184,7 +159,7 @@ Motion events are logged for monitoring:
 ```
 INFO - Motion detected! Change: 12.34%, Event #5
 DEBUG - Motion ended. Change: 1.23%
-INFO - Snapshot saved: /path/to/motion_20231215_143022.jpg
+INFO - Snapshot saved to RAM: 45678 bytes, total snapshots: 5
 ```
 
 ### Performance Considerations
@@ -207,10 +182,10 @@ Motion detection is CPU-intensive, especially on Raspberry Pi Zero:
 - Check camera is working: view `/webcam.jpg`
 - Enable debug logging: `--log-level DEBUG`
 
-**Snapshots filling disk:**
-- Set snapshot limit: `--motion-snapshot-limit 100`
-- Use systemd tmpfiles.d for automatic cleanup
-- Monitor disk space with cron
+**Too much memory usage:**
+- Set snapshot limit: `--motion-snapshot-limit 50`
+- Each snapshot is ~50-100KB depending on resolution
+- Limit controls maximum RAM usage for snapshot storage
 
 ## Testing
 

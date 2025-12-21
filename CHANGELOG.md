@@ -2,50 +2,83 @@
 
 ## Completed Improvements
 
-### Flash Storage Protection
-**Priority:** High | **Complexity:** Low | **Time:** 1 ticket
+### In-Memory Snapshot Storage (RAM-Only)
+**Priority:** High | **Complexity:** Medium | **Time:** 1 ticket
 
-Added detection and warnings for non-RAM storage to protect SD card longevity:
+Complete redesign of snapshot storage to use RAM instead of filesystem, eliminating all disk writes:
 
-**Feature Added:**
-- ✅ **tmpfs (RAM) Detection for Snapshots** - Detects if snapshot directory is on flash storage and warns user
+**Changes:**
+- ✅ **Removed All Disk I/O** - Snapshots now stored entirely in RAM as Python objects
+- ✅ **No SD Card Writes** - Zero filesystem operations for snapshot storage
+- ✅ **Simplified Configuration** - Removed `--motion-snapshot-dir` argument
+- ✅ **Faster Access** - Direct memory access, no disk I/O latency
 
 **Technical Changes:**
 
-1. **Filesystem Type Detection (webcam.py:685-698)**:
-   - Uses `stat -f -c %T` to detect filesystem type
-   - Checks if snapshot directory is mounted on tmpfs (RAM)
-   - Issues warning if on ext4, vfat, or other flash-based filesystems
-   - Provides actionable recommendation with tmpfs mount command
+1. **In-Memory Storage (webcam.py:45-46)**:
+   - Replaced `latest_snapshot_path` with `snapshot_history` list
+   - Stores tuples of `(timestamp, jpeg_bytes)` in RAM
+   - Thread-safe access with `snapshot_lock`
 
-2. **Documentation (README.md:132-155)**:
-   - Added "RAM-Only Operation" section to Motion Detection guide
-   - Step-by-step tmpfs setup instructions
-   - Explains SD card wear concerns
-   - Shows how to make tmpfs persistent across reboots
+2. **Snapshot Saving (webcam.py:94-127)**:
+   - `save_motion_snapshot()` appends to in-memory list
+   - Automatic cleanup when limit exceeded (keeps newest N)
+   - No file I/O, no directory creation, no disk operations
+
+3. **HTTP Endpoints Updated**:
+   - `/motion/status`: Reports snapshot count and storage type ("RAM (in-memory)")
+   - `/motion/snapshot`: Serves JPEG directly from RAM
+
+4. **Removed Code**:
+   - Eliminated `cleanup_old_snapshots()` file deletion function
+   - Removed tmpfs detection and warnings
+   - Removed directory path validation
+   - Removed `--motion-snapshot-dir` argument
+
+**Memory Usage:**
+- Each 640×480 JPEG snapshot: ~50-100KB
+- 50 snapshots: ~2.5-5MB RAM
+- 100 snapshots: ~5-10MB RAM
+- Negligible impact on Pi with 512MB+ RAM
 
 **User Experience:**
 ```bash
-# When snapshots configured on flash storage
-$ python3 webcam.py --motion-detect --motion-snapshot
-WARNING - Snapshot directory './snapshots' is on ext4, not tmpfs (RAM)
-WARNING - This will write to flash storage and may wear out SD card
-WARNING - Consider using tmpfs: mount -t tmpfs -o size=100M tmpfs /tmp/snapshots
+# Snapshots stored in RAM (no disk writes)
+$ python3 webcam.py --motion-detect --motion-snapshot --motion-snapshot-limit 50
+INFO - Motion detection enabled: threshold=5.0%, cooldown=5.0s
+INFO - Motion snapshots enabled: storage=RAM, limit=50
+INFO - Snapshot saved to RAM: 45678 bytes, total snapshots: 5
 
-# No warning when using tmpfs
-$ python3 webcam.py --motion-detect --motion-snapshot --motion-snapshot-dir /tmp/snapshots
-INFO - Motion snapshots enabled: dir=/tmp/snapshots, limit=0
+# API shows in-memory storage
+$ curl http://pi-noir-camera.local:8000/motion/status | jq '.snapshot'
+{
+  "enabled": true,
+  "storage": "RAM (in-memory)",
+  "count": 5,
+  "limit": 50,
+  "latest_timestamp": 1735154823.456
+}
 ```
 
-**SD Card Protection:**
-- Motion detection can generate many snapshots (dozens per hour)
-- Each write wears SD card (limited write cycles)
-- tmpfs stores snapshots in RAM (no SD card writes)
-- Snapshots lost on reboot (acceptable for motion detection use case)
+**Benefits:**
+- **SD Card Longevity**: No wear from continuous snapshot writes
+- **Performance**: Faster than disk I/O (memory access vs filesystem)
+- **Simplicity**: No directory configuration or tmpfs setup needed
+- **Reliability**: No disk space issues, no file permissions problems
+- **Portability**: Works identically on all systems
+
+**Trade-offs:**
+- Snapshots lost on restart (acceptable for motion detection use case)
+- Limited by available RAM (mitigated by configurable limit)
 
 **Files Modified:**
-- webcam.py:685-698 (tmpfs detection and warning)
-- README.md:132-155 (RAM-only operation guide)
+- webcam.py:45-46 (global storage variables)
+- webcam.py:94-127 (save_motion_snapshot function)
+- webcam.py:422-425 (motion/status endpoint)
+- webcam.py:459-474 (motion/snapshot endpoint)
+- webcam.py:537-540 (argument parser)
+- webcam.py:635-643 (snapshot configuration)
+- README.md:53-54, 95-103, 124-130, 159-163, 185-188 (documentation updates)
 
 ---
 
