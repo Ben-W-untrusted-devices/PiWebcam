@@ -14,52 +14,6 @@ _No issues currently in progress_
 
 ## Current Issues
 
-### Missing Input Validation: Negative Snapshot Limit
-**Priority:** Low
-**Complexity:** Low
-
-**Issue:**
-`--motion-snapshot-limit` (line 565) accepts any integer including negative values. While the check on line 127 prevents negative limits from being used, the argument parser should validate this.
-
-**Solution:**
-```python
-parser.add_argument('--motion-snapshot-limit', type=int, default=0,
-    help='Max snapshots to keep, 0=unlimited (default: 0)',
-    choices=range(0, 10000))  # or use a custom validator
-```
-
-**Location:** webcam.py:565
-
----
-
-### Performance: Double Frame Comparison During Motion
-**Priority:** Medium
-**Complexity:** Medium
-
-**Issue:**
-When in MOTION_DETECTED state, frames are compared twice per iteration:
-1. Line 211: `compare_frames(self.previous_frame, current_frame_bytes)`
-2. Line 241: `compare_frames(self.baseline_frame, current_frame_bytes)`
-
-Each comparison processes every pixel. This doubles CPU usage during motion events.
-
-**Impact:**
-- 2x CPU usage during motion detection
-- Potential frame drops on Pi Zero
-- Higher power consumption
-
-**Solution:**
-Restructure logic to avoid redundant comparison:
-```python
-# Calculate baseline comparison once
-baseline_change = compare_frames(self.baseline_frame, current_frame_bytes)
-# Use both baseline_change and change_percentage for state logic
-```
-
-**Location:** webcam.py:211, 241
-
----
-
 ### Memory Usage: Multiple Frame Copies in Memory
 **Priority:** Low
 **Complexity:** Medium

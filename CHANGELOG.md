@@ -2,6 +2,53 @@
 
 ## Completed Improvements
 
+### Performance and Validation Improvements
+**Priority:** Medium/Low | **Complexity:** Medium/Low | **Time:** 2 tickets
+
+Performance optimization and input validation improvements:
+
+**Issues Resolved:**
+- ✅ **Performance: Double Frame Comparison During Motion** - Eliminated redundant frame comparisons during motion detection
+- ✅ **Missing Input Validation: Negative Snapshot Limit** - Added validation to reject negative snapshot limits
+
+**Technical Changes:**
+
+1. **Motion Detection Performance Optimization (webcam.py:205-255)**:
+   - Restructured state machine to perform only one frame comparison per iteration
+   - **IDLE state**: Compare previous to current frame (detects motion start)
+   - **MOTION_DETECTED state**: Compare baseline to current frame only (detects motion end)
+   - **COOLDOWN state**: No comparison needed (skip entirely)
+   - Eliminates duplicate comparison that was processing every pixel twice
+   - Reduces CPU usage by ~50% during motion events
+
+2. **Snapshot Limit Validation (webcam.py:681-684)**:
+   - Validates snapshot limit is non-negative (>= 0)
+   - Clear error message when negative values provided
+   - Prevents runtime errors from invalid configuration
+
+**Performance Impact:**
+```
+Before: 2 frame comparisons per iteration during motion (IDLE→MOTION_DETECTED)
+After: 1 frame comparison per iteration (state-specific)
+
+CPU savings: ~50% during motion detection
+Critical for: Pi Zero with limited processing power
+Benefit: Reduced frame drops, lower power consumption
+```
+
+**User Experience:**
+```bash
+# Negative snapshot limit now rejected immediately
+$ python3 webcam.py --motion-snapshot --motion-snapshot-limit -10
+ERROR - Snapshot limit must be >= 0, got -10
+```
+
+**Files Modified:**
+- webcam.py:205-255 (motion detection state machine optimization)
+- webcam.py:681-684 (snapshot limit validation)
+
+---
+
 ### Security and Input Validation Improvements
 **Priority:** High/Medium | **Complexity:** Low | **Time:** 5 tickets
 

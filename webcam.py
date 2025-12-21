@@ -209,13 +209,6 @@ class MotionDetector:
 				self.baseline_frame = current_frame_bytes
 				return False, 0.0
 
-			# Compare frames
-			change_percentage = compare_frames(self.previous_frame, current_frame_bytes)
-			self.last_change_percentage = change_percentage
-
-			# Update previous frame for next comparison
-			self.previous_frame = current_frame_bytes
-
 			# Check if we're in cooldown
 			if self.state == self.STATE_COOLDOWN:
 				if self._is_cooldown_expired():
@@ -223,11 +216,16 @@ class MotionDetector:
 					self.baseline_frame = current_frame_bytes
 					# Fall through to check if this frame triggers new motion
 				else:
-					# Still in cooldown, don't trigger
-					return False, change_percentage
+					# Still in cooldown, don't trigger (no comparison needed)
+					return False, self.last_change_percentage
 
-			# Handle state transitions based on current state
+			# Handle state-specific frame comparisons
 			if self.state == self.STATE_IDLE:
+				# Compare with previous frame to detect motion start
+				change_percentage = compare_frames(self.previous_frame, current_frame_bytes)
+				self.last_change_percentage = change_percentage
+				self.previous_frame = current_frame_bytes
+
 				# Check if motion started
 				if change_percentage >= self.threshold:
 					# New motion detected!
@@ -239,21 +237,22 @@ class MotionDetector:
 					return False, change_percentage
 
 			elif self.state == self.STATE_MOTION_DETECTED:
-				# Always check if we've returned to baseline (motion ended)
+				# Compare with baseline to detect motion end (optimization: single comparison)
 				baseline_change = compare_frames(self.baseline_frame, current_frame_bytes)
+				self.last_change_percentage = baseline_change
+				self.previous_frame = current_frame_bytes
+
 				if baseline_change < self.threshold:
 					# Returned to baseline, motion ended
 					self.state = self.STATE_COOLDOWN
 					self.last_motion_time = time.time()
-					return False, change_percentage
+					return False, baseline_change
 				else:
 					# Still away from baseline (motion ongoing)
-					if change_percentage >= self.threshold:
-						# Update timestamp on significant changes
-						self.last_motion_time = time.time()
-					return True, change_percentage
+					self.last_motion_time = time.time()
+					return True, baseline_change
 
-			return False, change_percentage
+			return False, self.last_change_percentage
 
 	def _is_cooldown_expired(self):
 		"""Check if cooldown period has expired"""
@@ -676,6 +675,11 @@ def main():
 			if any(snapshot_dir.startswith(prefix) for prefix in unsafe_prefixes):
 				logger.error(f"Unsafe snapshot directory: {snapshot_dir}")
 				logger.error(f"Cannot write to system directories: {', '.join(unsafe_prefixes)}")
+				sys.exit(1)
+
+			# Validate snapshot limit is non-negative
+			if args.motion_snapshot_limit < 0:
+				logger.error(f"Snapshot limit must be >= 0, got {args.motion_snapshot_limit}")
 				sys.exit(1)
 
 			MOTION_SNAPSHOT_ENABLED = True
