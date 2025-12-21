@@ -129,6 +129,31 @@ python3 webcam.py --motion-detect \
 - Use `--motion-snapshot-limit` to auto-delete old snapshots
 - Set to 0 for unlimited (disk space permitting)
 
+**RAM-Only Operation (Recommended for SD Card Longevity)**
+
+To avoid wearing out the SD card with continuous writes, use tmpfs (RAM disk) for snapshots:
+
+```bash
+# Create tmpfs mount for snapshots (100MB, lost on reboot)
+sudo mkdir -p /tmp/snapshots
+sudo mount -t tmpfs -o size=100M tmpfs /tmp/snapshots
+
+# Run with snapshots in RAM
+python3 webcam.py --motion-detect --motion-snapshot \
+  --motion-snapshot-dir /tmp/snapshots \
+  --motion-snapshot-limit 50
+
+# Make tmpfs persistent across reboots (add to /etc/fstab)
+echo "tmpfs /tmp/snapshots tmpfs defaults,size=100M,mode=1777 0 0" | sudo tee -a /etc/fstab
+```
+
+The application will warn if snapshots are configured on non-tmpfs storage:
+```
+WARNING - Snapshot directory '/home/pi/snapshots' is on ext4, not tmpfs (RAM)
+WARNING - This will write to flash storage and may wear out SD card
+WARNING - Consider using tmpfs: mount -t tmpfs -o size=100M tmpfs /tmp/snapshots
+```
+
 ### API Usage
 
 **Check motion status:**

@@ -2,6 +2,53 @@
 
 ## Completed Improvements
 
+### Flash Storage Protection
+**Priority:** High | **Complexity:** Low | **Time:** 1 ticket
+
+Added detection and warnings for non-RAM storage to protect SD card longevity:
+
+**Feature Added:**
+- ✅ **tmpfs (RAM) Detection for Snapshots** - Detects if snapshot directory is on flash storage and warns user
+
+**Technical Changes:**
+
+1. **Filesystem Type Detection (webcam.py:685-698)**:
+   - Uses `stat -f -c %T` to detect filesystem type
+   - Checks if snapshot directory is mounted on tmpfs (RAM)
+   - Issues warning if on ext4, vfat, or other flash-based filesystems
+   - Provides actionable recommendation with tmpfs mount command
+
+2. **Documentation (README.md:132-155)**:
+   - Added "RAM-Only Operation" section to Motion Detection guide
+   - Step-by-step tmpfs setup instructions
+   - Explains SD card wear concerns
+   - Shows how to make tmpfs persistent across reboots
+
+**User Experience:**
+```bash
+# When snapshots configured on flash storage
+$ python3 webcam.py --motion-detect --motion-snapshot
+WARNING - Snapshot directory './snapshots' is on ext4, not tmpfs (RAM)
+WARNING - This will write to flash storage and may wear out SD card
+WARNING - Consider using tmpfs: mount -t tmpfs -o size=100M tmpfs /tmp/snapshots
+
+# No warning when using tmpfs
+$ python3 webcam.py --motion-detect --motion-snapshot --motion-snapshot-dir /tmp/snapshots
+INFO - Motion snapshots enabled: dir=/tmp/snapshots, limit=0
+```
+
+**SD Card Protection:**
+- Motion detection can generate many snapshots (dozens per hour)
+- Each write wears SD card (limited write cycles)
+- tmpfs stores snapshots in RAM (no SD card writes)
+- Snapshots lost on reboot (acceptable for motion detection use case)
+
+**Files Modified:**
+- webcam.py:685-698 (tmpfs detection and warning)
+- README.md:132-155 (RAM-only operation guide)
+
+---
+
 ### Performance and Validation Improvements
 **Priority:** Medium/Low | **Complexity:** Medium/Low | **Time:** 2 tickets
 

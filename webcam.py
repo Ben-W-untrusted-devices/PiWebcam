@@ -39,12 +39,11 @@ frame_lock = threading.Lock()
 # Motion detector instance (None if disabled)
 motion_detector = None
 
-# Motion snapshot configuration
+# Motion snapshot configuration (in-memory storage)
 MOTION_SNAPSHOT_ENABLED = False
-MOTION_SNAPSHOT_DIR = './snapshots'
 MOTION_SNAPSHOT_LIMIT = 0
-latest_snapshot_path = None  # Track most recent snapshot
-snapshot_lock = threading.Lock()  # Protect latest_snapshot_path
+snapshot_history = []  # List of (timestamp, bytes) tuples - stored in RAM
+snapshot_lock = threading.Lock()  # Protect snapshot_history
 
 # Motion detection functions
 def compare_frames(frame1_bytes, frame2_bytes, threshold=5.0):
@@ -681,6 +680,21 @@ def main():
 			if args.motion_snapshot_limit < 0:
 				logger.error(f"Snapshot limit must be >= 0, got {args.motion_snapshot_limit}")
 				sys.exit(1)
+
+			# Check if snapshot directory is on tmpfs (RAM) to avoid flash writes
+			try:
+				import subprocess
+				result = subprocess.run(['stat', '-f', '-c', '%T', snapshot_dir],
+				                       capture_output=True, text=True, timeout=2)
+				if result.returncode == 0:
+					fs_type = result.stdout.strip()
+					if fs_type != 'tmpfs':
+						logger.warning(f"Snapshot directory '{snapshot_dir}' is on {fs_type}, not tmpfs (RAM)")
+						logger.warning("This will write to flash storage and may wear out SD card")
+						logger.warning("Consider using tmpfs: mount -t tmpfs -o size=100M tmpfs /tmp/snapshots")
+			except Exception:
+				# stat command failed or not available, skip check
+				pass
 
 			MOTION_SNAPSHOT_ENABLED = True
 			MOTION_SNAPSHOT_DIR = snapshot_dir
