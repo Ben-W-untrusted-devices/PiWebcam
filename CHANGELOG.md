@@ -2,7 +2,89 @@
 
 ## Completed Improvements
 
-### Motion Detection Feature (December 2024)
+### Security and Input Validation Improvements
+**Priority:** High/Medium | **Complexity:** Low | **Time:** 5 tickets
+
+Comprehensive security hardening and input validation across all user-controllable parameters:
+
+**Issues Resolved:**
+- ✅ **Race Condition on latest_snapshot_path** - Global variable accessed from multiple threads without synchronization
+- ✅ **Missing Camera Resolution Validation** - No bounds checking on resolution parameters
+- ✅ **Missing Camera Framerate Validation** - No validation of framerate limits
+- ✅ **Missing Port Number Validation** - Invalid port numbers not rejected
+- ✅ **Unsafe Snapshot Directory Paths** - No protection against writing to system directories
+
+**Technical Changes:**
+
+1. **Thread Safety (webcam.py:47, 125-126, 457-458, 487-488)**:
+   - Added `snapshot_lock` to protect `latest_snapshot_path` global variable
+   - Protected writes in `save_motion_snapshot()` function
+   - Protected reads in `/motion/status` and `/motion/snapshot` endpoints
+   - Prevents TOCTOU race conditions and stale path reads
+
+2. **Camera Resolution Validation (webcam.py:592-600)**:
+   - Enforces PiCamera V2 limits: 64-3280x64-2464
+   - Rejects negative, zero, or extreme values
+   - Clear error messages with valid range
+   - Prevents camera initialization failures
+
+3. **Camera Framerate Validation (webcam.py:602-605)**:
+   - Enforces PiCamera limits: 1-90 fps
+   - Rejects invalid framerates before camera initialization
+   - Prevents application crashes from hardware limits
+
+4. **Port Number Validation (webcam.py:631-637)**:
+   - Validates range: 1-65535 (standard TCP/IP port range)
+   - Warns when privileged ports (<1024) are used
+   - Provides actionable error messages
+
+5. **Snapshot Directory Security (webcam.py:673-679)**:
+   - Converts to absolute path for consistent validation
+   - Blocks writes to system directories: `/etc`, `/root`, `/sys`, `/proc`, `/boot`
+   - Prevents accidental file overwrites in sensitive locations
+   - Protects against path traversal attacks
+
+**User Experience:**
+```bash
+# Invalid resolution rejected with clear message
+$ python3 webcam.py --resolution 99999x99999
+ERROR - Resolution 99999x99999 out of range. Must be 64-3280x64-2464
+
+# Invalid framerate rejected
+$ python3 webcam.py --framerate 200
+ERROR - Framerate 200 out of range. Must be between 1 and 90 fps
+
+# Invalid port rejected
+$ python3 webcam.py --port 70000
+ERROR - Port 70000 must be between 1 and 65535
+
+# Privileged port warning
+$ python3 webcam.py --port 80
+WARNING - Port 80 requires root privileges
+
+# Unsafe directory blocked
+$ python3 webcam.py --motion-snapshot --motion-snapshot-dir /etc
+ERROR - Unsafe snapshot directory: /etc
+ERROR - Cannot write to system directories: /etc, /root, /sys, /proc, /boot
+```
+
+**Security Impact:**
+- Eliminates race condition that could serve wrong snapshots or cause crashes
+- Prevents camera hardware failures from invalid parameters
+- Blocks attempts to write to system directories
+- Provides defense-in-depth against malicious or accidental misuse
+
+**Files Modified:**
+- webcam.py:47 (snapshot_lock addition)
+- webcam.py:125-126 (thread-safe write)
+- webcam.py:457-458, 487-488 (thread-safe reads)
+- webcam.py:592-605 (resolution and framerate validation)
+- webcam.py:631-637 (port validation)
+- webcam.py:673-679 (snapshot directory validation)
+
+---
+
+### Motion Detection Feature
 **Priority:** Medium | **Complexity:** Medium | **Time:** 8 tickets across 3 phases
 
 Complete motion detection system using frame differencing algorithm:
@@ -46,7 +128,7 @@ Complete motion detection system using frame differencing algorithm:
 
 ---
 
-### Motion Detection Cooldown State Machine Fix (December 2024)
+### Motion Detection Cooldown State Machine Fix
 **Priority:** Medium | **Complexity:** Low
 
 Fixed critical bugs in the motion detection state machine that prevented proper cooldown behavior:

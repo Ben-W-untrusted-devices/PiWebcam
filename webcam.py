@@ -44,6 +44,7 @@ MOTION_SNAPSHOT_ENABLED = False
 MOTION_SNAPSHOT_DIR = './snapshots'
 MOTION_SNAPSHOT_LIMIT = 0
 latest_snapshot_path = None  # Track most recent snapshot
+snapshot_lock = threading.Lock()  # Protect latest_snapshot_path
 
 # Motion detection functions
 def compare_frames(frame1_bytes, frame2_bytes, threshold=5.0):
@@ -121,7 +122,8 @@ def save_motion_snapshot(frame_bytes):
 			f.write(frame_bytes)
 
 		logger.info(f"Snapshot saved: {filepath}")
-		latest_snapshot_path = filepath
+		with snapshot_lock:
+			latest_snapshot_path = filepath
 
 		# Cleanup old snapshots if limit is set
 		if MOTION_SNAPSHOT_LIMIT > 0:
@@ -450,6 +452,11 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 				return
 
 			status = motion_detector.get_status()
+
+			# Thread-safe read of snapshot path
+			with snapshot_lock:
+				snapshot_path = latest_snapshot_path
+
 			motion_status = {
 				"enabled": True,
 				"state": status['state'],
@@ -465,7 +472,7 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 					"enabled": MOTION_SNAPSHOT_ENABLED,
 					"directory": MOTION_SNAPSHOT_DIR if MOTION_SNAPSHOT_ENABLED else None,
 					"limit": MOTION_SNAPSHOT_LIMIT if MOTION_SNAPSHOT_ENABLED else None,
-					"latest": latest_snapshot_path
+					"latest": snapshot_path
 				}
 			}
 
@@ -481,13 +488,17 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 				self.wfile.write(b"Motion detection not enabled")
 				return
 
-			if not MOTION_SNAPSHOT_ENABLED or latest_snapshot_path is None:
+			# Thread-safe read of snapshot path
+			with snapshot_lock:
+				snapshot_path = latest_snapshot_path
+
+			if not MOTION_SNAPSHOT_ENABLED or snapshot_path is None:
 				self.sendHeader(response=404, contentType="text/plain")
 				self.wfile.write(b"No snapshot available")
 				return
 
 			try:
-				with open(latest_snapshot_path, 'rb') as f:
+				with open(snapshot_path, 'rb') as f:
 					snapshot_data = f.read()
 				self.sendHeader(contentType="image/jpeg")
 				self.wfile.write(snapshot_data)
@@ -578,6 +589,21 @@ def initialize_camera(resolution_str, framerate):
 		logger.error(f"Invalid resolution format '{resolution_str}'. Use WIDTHxHEIGHT (e.g., 640x480)")
 		sys.exit(1)
 
+	# Validate resolution is within PiCamera supported range
+	MAX_WIDTH = 3280  # Pi Camera V2 max
+	MAX_HEIGHT = 2464
+	MIN_WIDTH = 64
+	MIN_HEIGHT = 64
+
+	if not (MIN_WIDTH <= width <= MAX_WIDTH and MIN_HEIGHT <= height <= MAX_HEIGHT):
+		logger.error(f"Resolution {width}x{height} out of range. Must be {MIN_WIDTH}-{MAX_WIDTH}x{MIN_HEIGHT}-{MAX_HEIGHT}")
+		sys.exit(1)
+
+	# Validate framerate is within PiCamera supported range
+	if not 1 <= framerate <= 90:
+		logger.error(f"Framerate {framerate} out of range. Must be between 1 and 90 fps")
+		sys.exit(1)
+
 	camera = PiCamera()
 	camera.resolution = (width, height)
 	camera.framerate = framerate
@@ -601,6 +627,14 @@ def main():
 		format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
 		datefmt='%Y-%m-%d %H:%M:%S'
 	)
+
+	# Validate port number
+	if not 1 <= args.port <= 65535:
+		logger.error(f"Port {args.port} must be between 1 and 65535")
+		sys.exit(1)
+
+	if args.port < 1024:
+		logger.warning(f"Port {args.port} requires root privileges")
 
 	# Update global configuration
 	HOST_NAME = args.host
@@ -636,8 +670,16 @@ def main():
 
 		# Configure motion snapshots
 		if args.motion_snapshot:
+			# Validate snapshot directory is safe
+			snapshot_dir = os.path.abspath(args.motion_snapshot_dir)
+			unsafe_prefixes = ['/etc', '/root', '/sys', '/proc', '/boot']
+			if any(snapshot_dir.startswith(prefix) for prefix in unsafe_prefixes):
+				logger.error(f"Unsafe snapshot directory: {snapshot_dir}")
+				logger.error(f"Cannot write to system directories: {', '.join(unsafe_prefixes)}")
+				sys.exit(1)
+
 			MOTION_SNAPSHOT_ENABLED = True
-			MOTION_SNAPSHOT_DIR = args.motion_snapshot_dir
+			MOTION_SNAPSHOT_DIR = snapshot_dir
 			MOTION_SNAPSHOT_LIMIT = args.motion_snapshot_limit
 			logger.info(f"Motion snapshots enabled: dir={MOTION_SNAPSHOT_DIR}, limit={MOTION_SNAPSHOT_LIMIT}")
 	else:
