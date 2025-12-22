@@ -657,7 +657,11 @@
 		}
 
 		webcamImage.onload = function() {
-			context.drawImage(webcamImage, 0, 0);
+			// Clear canvas to remove any old data
+			context.clearRect(0, 0, webcamElement.width, webcamElement.height);
+
+			// Scale image to fill entire canvas
+			context.drawImage(webcamImage, 0, 0, webcamElement.width, webcamElement.height);
 
 			// Update connection status
 			statusElement.textContent = 'Connected';
