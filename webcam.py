@@ -259,6 +259,7 @@ def capture_loop():
 	last_perf_log = time.time()
 	total_capture_time = 0.0
 	total_motion_time = 0.0
+	total_frame_size = 0
 
 	while True:
 		try:
@@ -267,10 +268,14 @@ def capture_loop():
 			# Capture to in-memory buffer
 			capture_start = time.time()
 			stream = io.BytesIO()
+			# Debug: Log quality on first capture
+			if frame_count == 0:
+				logger.info(f"Using JPEG quality: {JPEG_QUALITY}")
 			camera.capture(stream, format='jpeg', use_video_port=True, quality=JPEG_QUALITY)
 			frame_bytes = stream.getvalue()
 			capture_time = time.time() - capture_start
 			total_capture_time += capture_time
+			total_frame_size += len(frame_bytes)
 
 			# Thread-safe update of current frame
 			with frame_lock:
@@ -303,12 +308,14 @@ def capture_loop():
 			if time.time() - last_perf_log >= 5.0:
 				avg_capture = (total_capture_time / frame_count) * 1000
 				avg_motion = (total_motion_time / frame_count) * 1000 if motion_detector else 0
+				avg_size = total_frame_size / frame_count / 1024  # KB
 				actual_fps = frame_count / (time.time() - last_perf_log)
-				logger.info(f"Performance: {actual_fps:.1f} FPS | Capture: {avg_capture:.1f}ms | Motion: {avg_motion:.1f}ms")
+				logger.info(f"Performance: {actual_fps:.1f} FPS | Capture: {avg_capture:.1f}ms | Size: {avg_size:.1f}KB | Motion: {avg_motion:.1f}ms")
 				frame_count = 0
 				last_perf_log = time.time()
 				total_capture_time = 0.0
 				total_motion_time = 0.0
+				total_frame_size = 0
 
 			# No artificial delay - capture as fast as possible
 			# Client request rate naturally throttles effective FPS
