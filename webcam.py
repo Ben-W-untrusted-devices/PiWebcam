@@ -10,7 +10,7 @@ import argparse
 import logging
 from picamera import PiCamera
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 # Configure logging
 logger = logging.getLogger('piwebcam')
@@ -759,9 +759,8 @@ def main():
 	monitoring_thread.start()
 	logger.info("Monitoring thread started")
 
-	# Start HTTP server
-	server_class = HTTPServer
-	httpd = server_class((HOST_NAME, PORT_NUMBER), SimpleCloudFileServer)
+	# Start HTTP server (threaded to handle multiple clients)
+	httpd = ThreadingHTTPServer((HOST_NAME, PORT_NUMBER), SimpleCloudFileServer)
 
 	logger.info(f"Server started on {HOST_NAME}:{PORT_NUMBER}")
 	logger.info(f"MJPEG stream available at: http://{HOST_NAME}:{PORT_NUMBER}/stream")

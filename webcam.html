@@ -396,7 +396,7 @@
 
 		<div class="video-wrapper">
 			<div id="webcamContainer">
-				<img id="webcamElement" src="stream" role="img" aria-label="Live webcam feed">
+				<img id="webcamElement" role="img" aria-label="Live webcam feed">
 			</div>
 			<div class="status-bar">
 				<div class="status-item">
@@ -675,7 +675,11 @@
 
 					// Update FPS display
 					if (data.stream && data.stream.fps !== undefined) {
-						fpsElement.textContent = `${data.stream.fps} FPS`;
+						if (data.stream.fps > 0) {
+							fpsElement.textContent = `${data.stream.fps} FPS`;
+						} else {
+							fpsElement.textContent = 'Starting...';
+						}
 					}
 
 					// Update motion status
@@ -772,6 +776,11 @@
 		// === INITIALIZATION ===
 		applyRotation();
 		updateZoom();
+
+		// Start stream after page loads (prevents blocking)
+		webcamElement.src = 'stream';
+
+		// Update status immediately and then every 2 seconds
 		updateMotionStatus();
 		setInterval(updateMotionStatus, 2000);
 	</script>
