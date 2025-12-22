@@ -254,7 +254,7 @@ class MotionDetector:
 # Background capture thread
 def capture_loop():
 	"""Continuously capture frames from camera to memory"""
-	global current_frame, motion_detector
+	global current_frame, motion_detector, JPEG_QUALITY
 	frame_count = 0
 	last_perf_log = time.time()
 	total_capture_time = 0.0
@@ -588,7 +588,7 @@ Examples:
 
 def initialize_camera(resolution_str, framerate):
 	"""Initialize and configure camera"""
-	global camera
+	global camera, JPEG_QUALITY
 
 	# Parse resolution string
 	try:
@@ -650,6 +650,7 @@ def main():
 		sys.exit(1)
 
 	JPEG_QUALITY = args.quality
+	logger.info(f"Setting JPEG quality to: {JPEG_QUALITY}")
 
 	# Update global configuration
 	HOST_NAME = args.host
