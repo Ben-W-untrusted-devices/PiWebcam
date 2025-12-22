@@ -6,7 +6,16 @@ After=network.target
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/PiWebcam
-ExecStart=/usr/bin/python3 /home/pi/PiWebcam/webcam.py
+ExecStart=/usr/bin/python3 /home/pi/PiWebcam/webcam.py --quality 50
+# Customize arguments above:
+#   --quality 50              # JPEG quality 1-100 (lower=faster, default: 85)
+#   --resolution 640x480      # Camera resolution (default: 640x480)
+#   --framerate 30            # Camera framerate (default: 30)
+#   --port 8000               # HTTP port (default: 8000)
+#   --motion-detect           # Enable motion detection
+#   --motion-snapshot         # Save snapshots on motion
+#   --motion-snapshot-limit 50  # Max snapshots in RAM
+# Example: ExecStart=/usr/bin/python3 /home/pi/PiWebcam/webcam.py --quality 50 --motion-detect --motion-snapshot --motion-snapshot-limit 100
 Restart=on-failure
 RestartSec=5
 
