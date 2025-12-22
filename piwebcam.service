@@ -12,10 +12,14 @@ ExecStart=/usr/bin/python3 /home/pi/PiWebcam/webcam.py --quality 50
 #   --resolution 640x480      # Camera resolution (default: 640x480)
 #   --framerate 30            # Camera framerate (default: 30)
 #   --port 8000               # HTTP port (default: 8000)
+#   --ssl                     # Enable HTTPS (requires cert.pem and key.pem)
+#   --cert cert.pem           # SSL certificate path
+#   --key key.pem             # SSL key path
 #   --motion-detect           # Enable motion detection
 #   --motion-snapshot         # Save snapshots on motion
 #   --motion-snapshot-limit 50  # Max snapshots in RAM
-# Example: ExecStart=/usr/bin/python3 /home/pi/PiWebcam/webcam.py --quality 50 --motion-detect --motion-snapshot --motion-snapshot-limit 100
+# Example with HTTPS: ExecStart=/usr/bin/python3 /home/pi/PiWebcam/webcam.py --ssl --port 8443 --quality 50
+# Example with motion: ExecStart=/usr/bin/python3 /home/pi/PiWebcam/webcam.py --quality 50 --motion-detect --motion-snapshot --motion-snapshot-limit 100
 Restart=on-failure
 RestartSec=5
 

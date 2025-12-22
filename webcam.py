@@ -8,6 +8,7 @@ import threading
 import base64
 import argparse
 import logging
+import ssl
 from picamera import PiCamera
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -622,6 +623,14 @@ Examples:
 		choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
 		help='Logging level (default: INFO)')
 
+	# SSL/HTTPS arguments
+	parser.add_argument('--ssl', action='store_true',
+		help='Enable HTTPS with SSL certificate')
+	parser.add_argument('--cert', default='cert.pem',
+		help='Path to SSL certificate file (default: cert.pem)')
+	parser.add_argument('--key', default='key.pem',
+		help='Path to SSL private key file (default: key.pem)')
+
 	# Motion detection arguments
 	parser.add_argument('--motion-detect', action='store_true',
 		help='Enable motion detection (default: disabled)')
@@ -762,8 +771,25 @@ def main():
 	# Start HTTP server (threaded to handle multiple clients)
 	httpd = ThreadingHTTPServer((HOST_NAME, PORT_NUMBER), SimpleCloudFileServer)
 
+	# Enable SSL/HTTPS if requested
+	if args.ssl:
+		if not os.path.exists(args.cert) or not os.path.exists(args.key):
+			logger.error(f"SSL certificate or key file not found")
+			logger.error(f"  Certificate: {args.cert}")
+			logger.error(f"  Key: {args.key}")
+			logger.error(f"Generate certificate with: ./generate-cert.sh")
+			sys.exit(1)
+
+		context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+		context.load_cert_chain(args.cert, args.key)
+		httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
+		protocol = "https"
+		logger.info("SSL/HTTPS enabled")
+	else:
+		protocol = "http"
+
 	logger.info(f"Server started on {HOST_NAME}:{PORT_NUMBER}")
-	logger.info(f"MJPEG stream available at: http://{HOST_NAME}:{PORT_NUMBER}/stream")
+	logger.info(f"MJPEG stream available at: {protocol}://{HOST_NAME}:{PORT_NUMBER}/stream")
 	try:
 		httpd.serve_forever()
 	except KeyboardInterrupt:

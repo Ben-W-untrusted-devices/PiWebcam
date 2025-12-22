@@ -27,11 +27,16 @@ python3 webcam.py
 # Run with custom settings
 python3 webcam.py --port 8080 --resolution 1280x720 --framerate 15
 
+# Run with HTTPS (see HTTPS section below)
+./generate-cert.sh  # One-time certificate generation
+python3 webcam.py --ssl --port 8443
+
 # View all options
 python3 webcam.py --help
 ```
 
 Access at: `http://pi-noir-camera.local:8000/webcam.html`
+With HTTPS: `https://pi-noir-camera.local:8443/webcam.html`
 
 ## Command-Line Options
 
@@ -186,6 +191,65 @@ Motion detection is CPU-intensive, especially on Raspberry Pi Zero:
 - Set snapshot limit: `--motion-snapshot-limit 50`
 - Each snapshot is ~50-100KB depending on resolution
 - Limit controls maximum RAM usage for snapshot storage
+
+## HTTPS / SSL Support
+
+PiWebcam supports HTTPS using self-signed certificates for secure local access.
+
+### Setup (One-time)
+
+```bash
+# Generate self-signed certificate (valid for 1 year)
+./generate-cert.sh
+```
+
+This creates two files:
+- `cert.pem` - SSL certificate
+- `key.pem` - Private key
+
+### Usage
+
+```bash
+# Run with HTTPS on port 8443
+python3 webcam.py --ssl --port 8443
+
+# Or use custom certificate paths
+python3 webcam.py --ssl --cert /path/to/cert.pem --key /path/to/key.pem
+```
+
+Access at: `https://pi-noir-camera.local:8443/webcam.html`
+
+### Browser Security Warning
+
+Since this uses a self-signed certificate, browsers will show a security warning:
+
+1. Click **"Advanced"** or **"Show Details"**
+2. Click **"Accept the Risk and Continue"** or **"Proceed to site"**
+3. This is safe for local network use
+
+You only need to accept the warning once per browser.
+
+### Certificate Renewal
+
+Certificates expire after 1 year. To renew:
+
+```bash
+# Regenerate certificate
+./generate-cert.sh
+
+# Restart server
+sudo systemctl restart piwebcam  # If using systemd service
+```
+
+### Why Self-Signed?
+
+Self-signed certificates are perfect for local network use:
+- ✓ Free and simple
+- ✓ Works offline
+- ✓ Encrypts traffic
+- ✗ Browser warnings (one-time per device)
+
+For internet-accessible servers, consider Let's Encrypt for trusted certificates.
 
 ## Testing
 
