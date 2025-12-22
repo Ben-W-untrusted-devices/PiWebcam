@@ -508,8 +508,10 @@
 		}
 
 		// Detect Picture-in-Picture support (requires both PiP API and canvas.captureStream)
+		// Safari supports both but doesn't work properly with canvas streams, so exclude it
 		const canvas = document.getElementById('webcamElement');
-		if ('pictureInPictureEnabled' in document && typeof canvas.captureStream === 'function') {
+		const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+		if ('pictureInPictureEnabled' in document && typeof canvas.captureStream === 'function' && !isSafari) {
 			document.getElementById('pipBtn').style.display = '';
 		}
 
