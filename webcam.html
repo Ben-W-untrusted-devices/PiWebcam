@@ -75,21 +75,16 @@
 		}
 
 		#webcamContainer {
-			display: flex;
-			align-items: center;
-			justify-content: center;
+			display: inline-block;
 			position: relative;
 			border-radius: 8px;
 			background: rgba(0, 0, 0, 0.3);
+			line-height: 0; /* Remove extra space below image */
 		}
 
 		#webcamElement {
 			display: block;
-			position: absolute;
-			top: 50%;
-			left: 50%;
 			max-width: 100%;
-			max-height: 100%;
 			transform-origin: center center;
 			transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
 			cursor: grab;
@@ -99,30 +94,21 @@
 			cursor: grabbing;
 		}
 
+		/* Rotation transforms - no positioning needed, image sizes naturally */
 		#webcamElement.rotate-n {
-			transform: translate(-50%, -50%) rotate(0deg) scale(var(--zoom, 1));
+			transform: rotate(0deg) scale(var(--zoom, 1));
 		}
 
 		#webcamElement.rotate-e {
-			transform: translate(-50%, -50%) rotate(90deg) scale(var(--zoom, 1));
+			transform: rotate(90deg) scale(var(--zoom, 1));
 		}
 
 		#webcamElement.rotate-s {
-			transform: translate(-50%, -50%) rotate(180deg) scale(var(--zoom, 1));
+			transform: rotate(180deg) scale(var(--zoom, 1));
 		}
 
 		#webcamElement.rotate-w {
-			transform: translate(-50%, -50%) rotate(270deg) scale(var(--zoom, 1));
-		}
-
-		#webcamContainer.portrait {
-			width: 480px;
-			height: 640px;
-		}
-
-		#webcamContainer.landscape {
-			width: 640px;
-			height: 480px;
+			transform: rotate(270deg) scale(var(--zoom, 1));
 		}
 
 		.status-bar {
@@ -528,17 +514,9 @@
 
 		function applyRotation() {
 			const webcamElement = document.getElementById("webcamElement");
-			const webcamContainer = document.getElementById("webcamContainer");
 
 			webcamElement.classList.remove('rotate-n', 'rotate-e', 'rotate-s', 'rotate-w');
-			webcamContainer.classList.remove('portrait', 'landscape');
 			webcamElement.classList.add('rotate-' + currentRotation.toLowerCase());
-
-			if (currentRotation === 'E' || currentRotation === 'W') {
-				webcamContainer.classList.add('portrait');
-			} else {
-				webcamContainer.classList.add('landscape');
-			}
 
 			document.querySelectorAll('#btn-n, #btn-e, #btn-s, #btn-w').forEach(btn => {
 				btn.classList.remove('active');
