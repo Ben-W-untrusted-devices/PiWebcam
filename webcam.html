@@ -504,6 +504,9 @@
 		}
 
 		// === ROTATION ===
+		let imageNaturalWidth = 0;
+		let imageNaturalHeight = 0;
+
 		function setRotation(direction) {
 			const newUrl = new URL(window.location);
 			newUrl.searchParams.set('rotation', direction);
@@ -512,11 +515,31 @@
 			applyRotation();
 		}
 
+		function updateContainerSize() {
+			const container = document.getElementById('webcamContainer');
+			const width = imageNaturalWidth;
+			const height = imageNaturalHeight;
+
+			if (!width || !height) return;
+
+			// For 90° and 270° rotation, swap dimensions
+			if (currentRotation === 'E' || currentRotation === 'W') {
+				container.style.width = height + 'px';
+				container.style.height = width + 'px';
+			} else {
+				container.style.width = width + 'px';
+				container.style.height = height + 'px';
+			}
+		}
+
 		function applyRotation() {
 			const webcamElement = document.getElementById("webcamElement");
 
 			webcamElement.classList.remove('rotate-n', 'rotate-e', 'rotate-s', 'rotate-w');
 			webcamElement.classList.add('rotate-' + currentRotation.toLowerCase());
+
+			// Update container size to match rotated dimensions
+			updateContainerSize();
 
 			document.querySelectorAll('#btn-n, #btn-e, #btn-s, #btn-w').forEach(btn => {
 				btn.classList.remove('active');
@@ -632,6 +655,13 @@
 		webcamElement.onload = function() {
 			statusElement.textContent = 'Connected';
 			connectionDot.className = 'status-dot connected';
+
+			// Capture natural dimensions and size container appropriately
+			if (webcamElement.naturalWidth && webcamElement.naturalHeight) {
+				imageNaturalWidth = webcamElement.naturalWidth;
+				imageNaturalHeight = webcamElement.naturalHeight;
+				updateContainerSize();
+			}
 		};
 
 		webcamElement.onerror = function() {
