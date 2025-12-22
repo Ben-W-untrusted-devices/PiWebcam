@@ -31,6 +31,7 @@ PORT_NUMBER = None
 AUTH_USER = None
 AUTH_PASS = None
 AUTH_ENABLED = False
+JPEG_QUALITY = 85
 
 # In-memory storage for current frame
 current_frame = None
@@ -266,7 +267,7 @@ def capture_loop():
 			# Capture to in-memory buffer
 			capture_start = time.time()
 			stream = io.BytesIO()
-			camera.capture(stream, format='jpeg', use_video_port=True)
+			camera.capture(stream, format='jpeg', use_video_port=True, quality=JPEG_QUALITY)
 			frame_bytes = stream.getvalue()
 			capture_time = time.time() - capture_start
 			total_capture_time += capture_time
@@ -556,6 +557,8 @@ Examples:
 		help='Camera resolution WIDTHxHEIGHT (default: 640x480)')
 	parser.add_argument('--framerate', type=int, default=30,
 		help='Camera framerate (default: 30)')
+	parser.add_argument('--quality', type=int, default=85,
+		help='JPEG quality 1-100, lower=faster encoding (default: 85)')
 	parser.add_argument('--no-auth', action='store_true',
 		help='Disable authentication even if WEBCAM_USER/WEBCAM_PASS are set')
 	parser.add_argument('--log-level', default='INFO',
@@ -608,12 +611,12 @@ def initialize_camera(resolution_str, framerate):
 
 	# Camera warm-up time
 	time.sleep(2)
-	logger.info(f"Camera initialized: {width}x{height} @ {framerate}fps")
+	logger.info(f"Camera initialized: {width}x{height} @ {framerate}fps, quality={JPEG_QUALITY}")
 
 def main():
 	"""Main entry point"""
 	global HOST_NAME, PORT_NUMBER, AUTH_USER, AUTH_PASS, AUTH_ENABLED, motion_detector
-	global MOTION_SNAPSHOT_ENABLED, MOTION_SNAPSHOT_LIMIT
+	global MOTION_SNAPSHOT_ENABLED, MOTION_SNAPSHOT_LIMIT, JPEG_QUALITY
 
 	# Parse command-line arguments
 	args = parse_args()
@@ -633,6 +636,13 @@ def main():
 
 	if args.port < 1024:
 		logger.warning(f"Port {args.port} requires root privileges")
+
+	# Validate JPEG quality
+	if not 1 <= args.quality <= 100:
+		logger.error(f"JPEG quality {args.quality} must be between 1 and 100")
+		sys.exit(1)
+
+	JPEG_QUALITY = args.quality
 
 	# Update global configuration
 	HOST_NAME = args.host
