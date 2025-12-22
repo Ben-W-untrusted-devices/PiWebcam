@@ -642,50 +642,53 @@
 		}
 
 		// === WEBCAM REFRESH ===
+		// Cache DOM elements and reuse image object for better performance
+		const webcamElement = document.getElementById("webcamElement");
+		const context = webcamElement.getContext("2d");
+		const statusElement = document.getElementById('status');
+		const connectionDot = document.getElementById('connectionDot');
+		const fpsElement = document.getElementById('fps');
+		const qualityElement = document.getElementById('quality');
+		const webcamImage = new Image();
+
 		function refreshWebcamPixels() {
-			const webcamURL = "webcam.jpg?t=" + (new Date()).getTime();
-			const webcamElement = document.getElementById("webcamElement");
-			const context = webcamElement.getContext("2d");
-			const statusElement = document.getElementById('status');
-			const connectionDot = document.getElementById('connectionDot');
-
-			const nextWebcamImage = new Image();
 			const loadStart = Date.now();
-
-			nextWebcamImage.onload = function() {
-				context.drawImage(nextWebcamImage, 0, 0);
-
-				// Update connection status
-				statusElement.textContent = 'Connected';
-				connectionDot.className = 'status-dot connected';
-
-				// Update FPS counter
-				frameCount++;
-				if (Date.now() - lastFpsUpdate > 1000) {
-					document.getElementById('fps').textContent = `${frameCount} FPS`;
-					frameCount = 0;
-					lastFpsUpdate = Date.now();
-				}
-
-				// Update quality indicator
-				const latency = Date.now() - loadStart;
-				const quality = latency < 50 ? 'Excellent' :
-				                latency < 100 ? 'Good' :
-				                latency < 200 ? 'Fair' : 'Poor';
-				document.getElementById('quality').textContent = quality;
-
-				setTimeout(refreshWebcamPixels, 1000/30);
-			};
-
-			nextWebcamImage.onerror = function() {
-				console.error("Failed to load webcam image, retrying...");
-				statusElement.textContent = 'Reconnecting...';
-				connectionDot.className = 'status-dot disconnected';
-				setTimeout(refreshWebcamPixels, 1000);
-			};
-
-			nextWebcamImage.src = webcamURL;
+			webcamImage.src = "webcam.jpg?t=" + loadStart;
 		}
+
+		webcamImage.onload = function() {
+			context.drawImage(webcamImage, 0, 0);
+
+			// Update connection status
+			statusElement.textContent = 'Connected';
+			connectionDot.className = 'status-dot connected';
+
+			// Update FPS counter
+			frameCount++;
+			if (Date.now() - lastFpsUpdate > 1000) {
+				fpsElement.textContent = `${frameCount} FPS`;
+				frameCount = 0;
+				lastFpsUpdate = Date.now();
+			}
+
+			// Update quality indicator
+			const latency = Date.now() - lastFrameTime;
+			const quality = latency < 50 ? 'Excellent' :
+			                latency < 100 ? 'Good' :
+			                latency < 200 ? 'Fair' : 'Poor';
+			qualityElement.textContent = quality;
+			lastFrameTime = Date.now();
+
+			// Start next frame immediately (no artificial delay)
+			refreshWebcamPixels();
+		};
+
+		webcamImage.onerror = function() {
+			console.error("Failed to load webcam image, retrying...");
+			statusElement.textContent = 'Reconnecting...';
+			connectionDot.className = 'status-dot disconnected';
+			setTimeout(refreshWebcamPixels, 1000);
+		};
 
 		// === MOTION DETECTION ===
 		function updateMotionStatus() {

@@ -283,7 +283,8 @@ def capture_loop():
 					if status['state'] == MotionDetector.STATE_COOLDOWN and change_pct < motion_detector.threshold:
 						logger.debug(f"Motion ended. Change: {change_pct:.2f}%")
 
-			time.sleep(1.0 / camera.framerate)
+			# No artificial delay - capture as fast as possible
+			# Client request rate naturally throttles effective FPS
 		except Exception as e:
 			logger.error(f"Capture error: {e}")
 			time.sleep(1)
