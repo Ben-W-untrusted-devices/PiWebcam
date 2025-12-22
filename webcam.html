@@ -661,10 +661,11 @@
 			connectionDot.className = 'status-dot disconnected';
 		};
 
-		// FPS estimation (MJPEG streams don't provide frame events, use server logs)
-		// Quality indicator removed (not applicable for streaming)
+		// FPS comes from server via /health endpoint (updated every 2s)
+		// Quality indicator hidden (not applicable for streaming)
+		qualityElement.style.display = 'none';
 
-		// === MOTION DETECTION ===
+		// === MOTION DETECTION & STATUS ===
 		function updateMotionStatus() {
 			fetch('health')
 				.then(response => response.json())
@@ -672,6 +673,12 @@
 					const motionIndicator = document.getElementById('motionIndicator');
 					const downloadBtn = document.getElementById('downloadBtn');
 
+					// Update FPS display
+					if (data.stream && data.stream.fps !== undefined) {
+						fpsElement.textContent = `${data.stream.fps} FPS`;
+					}
+
+					// Update motion status
 					if (data.motion && data.motion.enabled) {
 						motionEnabled = true;
 						downloadBtn.style.display = '';  // Show download button
@@ -695,7 +702,7 @@
 					}
 				})
 				.catch(error => {
-					console.error('Failed to fetch motion status:', error);
+					console.error('Failed to fetch health status:', error);
 				});
 		}
 

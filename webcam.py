@@ -37,6 +37,10 @@ JPEG_QUALITY = 85
 current_frame = None
 frame_lock = threading.Lock()
 
+# Global performance metrics
+stream_fps = 0.0
+fps_lock = threading.Lock()
+
 # Streaming output for MJPEG
 class StreamingOutput:
 	"""Thread-safe output for MJPEG streaming"""
@@ -275,7 +279,7 @@ class MotionDetector:
 # Background monitoring thread for motion detection and performance stats
 def monitoring_loop():
 	"""Monitor stream frames for motion detection and log performance"""
-	global current_frame, motion_detector, streaming_output
+	global current_frame, motion_detector, streaming_output, stream_fps
 	frame_count = 0
 	last_perf_log = time.time()
 	total_frame_size = 0
@@ -321,6 +325,11 @@ def monitoring_loop():
 			if time.time() - last_perf_log >= 5.0:
 				avg_size = total_frame_size / frame_count / 1024  # KB
 				actual_fps = frame_count / (time.time() - last_perf_log)
+
+				# Update global FPS metric
+				with fps_lock:
+					stream_fps = actual_fps
+
 				logger.info(f"Stream Performance: {actual_fps:.1f} FPS | Avg Size: {avg_size:.1f}KB")
 				frame_count = 0
 				last_perf_log = time.time()
@@ -454,12 +463,19 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 			with frame_lock:
 				camera_ready = current_frame is not None
 
+			# Get current stream FPS
+			with fps_lock:
+				current_fps = stream_fps
+
 			health_status = {
 				"status": "ok",
 				"camera": {
 					"ready": camera_ready,
 					"resolution": f"{int(camera.resolution[0])}x{int(camera.resolution[1])}",
 					"framerate": float(camera.framerate)
+				},
+				"stream": {
+					"fps": round(current_fps, 1)
 				},
 				"server": {
 					"host": HOST_NAME,
