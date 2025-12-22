@@ -122,35 +122,6 @@ Apply consistent explicit type conversion to all JSON endpoints for robustness.
 
 ---
 
-### HTTPS Support
-**Priority:** Low
-**Complexity:** High
-
-**Issue:**
-All traffic (including credentials if auth is enabled) is sent unencrypted over HTTP.
-
-**Recommendation:**
-Use a reverse proxy (nginx/Apache) with SSL rather than implementing HTTPS directly in Python. This is the standard production approach.
-
-**Example nginx config:**
-```nginx
-server {
-    listen 443 ssl;
-    server_name camera.example.com;
-
-    ssl_certificate /etc/letsencrypt/live/camera.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/camera.example.com/privkey.pem;
-
-    location / {
-        proxy_pass http://localhost:8000;
-    }
-}
-```
-
----
-
----
-
 ## Future Considerations (Not Yet Planned)
 
 ### Credential Storage
