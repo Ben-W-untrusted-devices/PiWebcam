@@ -4,6 +4,107 @@ This file tracks UI/feature improvements that require backend implementation.
 
 ---
 
+## H.264 Hardware Encoder Streaming
+
+**Priority:** High
+**Complexity:** High
+**Category:** Performance Enhancement
+
+**Description:**
+Use Pi camera's hardware H.264 encoder for 30 FPS video streaming instead of individual JPEG captures (currently limited to 8-10 FPS).
+
+**Current Limitation:**
+- Using individual `camera.capture()` calls in loop
+- Each capture has overhead: sensor readout + ISP + format conversion
+- JPEG encoding even at lowest quality only achieves 8-10 FPS
+- Theoretical limit of individual captures: ~10 FPS regardless of settings
+
+**Backend Requirements:**
+
+1. **Server-side H.264 recording:**
+   - Replace capture loop with `camera.start_recording(output, format='h264')`
+   - Implement H.264 stream packaging (fMP4 or HLS)
+   - Handle fragmented MP4 with proper headers for live streaming
+   - Manage segment buffering and client synchronization
+
+2. **New endpoint: `/stream` (H.264)**
+   - Serve H.264 stream as fragmented MP4
+   - Or implement HLS with .m3u8 playlist + .ts segments
+   - Proper MIME types and headers for live streaming
+   - Handle multiple concurrent clients
+
+3. **Alternative: Keep simpler architecture with better performance**
+   - Use `camera.start_recording(output, format='mjpeg')`
+   - Serve as multipart/x-mixed-replace stream (MJPEG)
+   - Simpler than H.264 but achieves 30 FPS goal
+   - Currently implemented (see CHANGELOG)
+
+**Frontend Requirements:**
+
+1. **Replace canvas with video element:**
+```html
+<video id="webcamElement" autoplay muted playsinline></video>
+```
+
+2. **Media Source Extensions (for H.264):**
+```javascript
+const video = document.getElementById('webcamElement');
+const mediaSource = new MediaSource();
+video.src = URL.createObjectURL(mediaSource);
+
+mediaSource.addEventListener('sourceopen', () => {
+    const sourceBuffer = mediaSource.addSourceBuffer('video/mp4; codecs="avc1.42E01E"');
+
+    // Fetch and append H.264 segments
+    fetch('/stream')
+        .then(response => {
+            const reader = response.body.getReader();
+            function push() {
+                reader.read().then(({ done, value }) => {
+                    if (done) return;
+                    sourceBuffer.appendBuffer(value);
+                    push();
+                });
+            }
+            sourceBuffer.addEventListener('updateend', push);
+            push();
+        });
+});
+```
+
+3. **Or use HLS.js library (simpler):**
+```javascript
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+const video = document.getElementById('webcamElement');
+if (Hls.isSupported()) {
+    const hls = new Hls();
+    hls.loadSource('/stream/playlist.m3u8');
+    hls.attachMedia(video);
+}
+</script>
+```
+
+4. **Keep rotation/zoom controls working on video element**
+
+**Expected Performance:**
+- Server: 30 FPS H.264 encode (hardware assisted, ~1-2 Mbps bitrate)
+- Network: 30 FPS (much lower bandwidth than MJPEG)
+- Client: 30 FPS hardware decode in browser
+- Latency: 1-3 seconds (buffering), configurable
+
+**Complexity Factors:**
+- Browser compatibility (Safari vs Chrome MSE differences)
+- Codec parameters and browser support (H.264 baseline profile)
+- Buffering strategies and latency tuning
+- Error recovery and stream reconnection
+- Segment timing and synchronization
+
+**Alternative Considered:**
+MJPEG streaming (implemented) achieves 30 FPS with moderate complexity. H.264 provides better bandwidth efficiency but significantly higher implementation complexity.
+
+---
+
 ## Motion Event Timeline
 
 **Priority:** Medium

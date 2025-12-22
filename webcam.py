@@ -33,9 +33,30 @@ AUTH_PASS = None
 AUTH_ENABLED = False
 JPEG_QUALITY = 85
 
-# In-memory storage for current frame
+# In-memory storage for current frame (legacy, for /webcam.jpg compatibility)
 current_frame = None
 frame_lock = threading.Lock()
+
+# Streaming output for MJPEG
+class StreamingOutput:
+	"""Thread-safe output for MJPEG streaming"""
+	def __init__(self):
+		self.frame = None
+		self.buffer = io.BytesIO()
+		self.condition = threading.Condition()
+
+	def write(self, buf):
+		"""Called by camera for each MJPEG frame"""
+		if buf.startswith(b'\xff\xd8'):
+			# New frame, store the previous complete frame
+			with self.condition:
+				self.buffer.truncate()
+				self.buffer.seek(0)
+				self.buffer.write(buf)
+				self.frame = self.buffer.getvalue()
+				self.condition.notify_all()
+
+streaming_output = StreamingOutput()
 
 # Motion detector instance (None if disabled)
 motion_detector = None
@@ -251,43 +272,35 @@ class MotionDetector:
 		with self.state_lock:
 			return self.state == self.STATE_MOTION_DETECTED
 
-# Background capture thread
-def capture_loop():
-	"""Continuously capture frames from camera to memory"""
-	global current_frame, motion_detector, JPEG_QUALITY
+# Background monitoring thread for motion detection and performance stats
+def monitoring_loop():
+	"""Monitor stream frames for motion detection and log performance"""
+	global current_frame, motion_detector, streaming_output
 	frame_count = 0
 	last_perf_log = time.time()
-	total_capture_time = 0.0
-	total_motion_time = 0.0
 	total_frame_size = 0
+
+	logger.info(f"MJPEG streaming started with quality={JPEG_QUALITY}")
 
 	while True:
 		try:
-			loop_start = time.time()
+			# Wait for a new frame from the stream
+			with streaming_output.condition:
+				streaming_output.condition.wait()
+				frame_bytes = streaming_output.frame
 
-			# Capture to in-memory buffer
-			capture_start = time.time()
-			stream = io.BytesIO()
-			# Debug: Log quality on first capture
-			if frame_count == 0:
-				logger.info(f"Using JPEG quality: {JPEG_QUALITY}")
-			camera.capture(stream, format='jpeg', use_video_port=True, quality=JPEG_QUALITY)
-			frame_bytes = stream.getvalue()
-			capture_time = time.time() - capture_start
-			total_capture_time += capture_time
-			total_frame_size += len(frame_bytes)
+			if frame_bytes is None:
+				continue
 
-			# Thread-safe update of current frame
+			# Update legacy current_frame for /webcam.jpg compatibility
 			with frame_lock:
 				current_frame = frame_bytes
 
+			total_frame_size += len(frame_bytes)
+
 			# Check for motion if enabled
-			motion_time = 0.0
 			if motion_detector is not None:
-				motion_start = time.time()
 				motion_detected, change_pct = motion_detector.check_motion(frame_bytes)
-				motion_time = time.time() - motion_start
-				total_motion_time += motion_time
 
 				# Log motion events
 				if motion_detected:
@@ -306,21 +319,15 @@ def capture_loop():
 			# Performance logging every 5 seconds
 			frame_count += 1
 			if time.time() - last_perf_log >= 5.0:
-				avg_capture = (total_capture_time / frame_count) * 1000
-				avg_motion = (total_motion_time / frame_count) * 1000 if motion_detector else 0
 				avg_size = total_frame_size / frame_count / 1024  # KB
 				actual_fps = frame_count / (time.time() - last_perf_log)
-				logger.info(f"Performance: {actual_fps:.1f} FPS | Capture: {avg_capture:.1f}ms | Size: {avg_size:.1f}KB | Motion: {avg_motion:.1f}ms")
+				logger.info(f"Stream Performance: {actual_fps:.1f} FPS | Avg Size: {avg_size:.1f}KB")
 				frame_count = 0
 				last_perf_log = time.time()
-				total_capture_time = 0.0
-				total_motion_time = 0.0
 				total_frame_size = 0
 
-			# No artificial delay - capture as fast as possible
-			# Client request rate naturally throttles effective FPS
 		except Exception as e:
-			logger.error(f"Capture error: {e}")
+			logger.error(f"Monitoring error: {e}")
 			time.sleep(1)
 
 class SimpleCloudFileServer(BaseHTTPRequestHandler):
@@ -403,7 +410,34 @@ class SimpleCloudFileServer(BaseHTTPRequestHandler):
 				self.send_auth_required()
 				return
 
-		# Handle webcam requests - serve from memory
+		# Handle MJPEG stream endpoint
+		if filename == "stream":
+			self.send_response(200)
+			self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=FRAME')
+			self.send_header('Access-Control-Allow-Origin', '*')
+			self.end_headers()
+			try:
+				while True:
+					with streaming_output.condition:
+						streaming_output.condition.wait()
+						frame = streaming_output.frame
+
+					if frame is None:
+						continue
+
+					self.wfile.write(b'--FRAME\r\n')
+					self.send_header('Content-Type', 'image/jpeg')
+					self.send_header('Content-Length', str(len(frame)))
+					self.end_headers()
+					self.wfile.write(frame)
+					self.wfile.write(b'\r\n')
+			except (BrokenPipeError, ConnectionResetError):
+				logger.debug("Client disconnected from stream")
+			except Exception as e:
+				logger.error(f"Stream error: {e}")
+			return
+
+		# Handle webcam requests - serve from memory (legacy, for compatibility)
 		if filename == "webcam.jpg":
 			with frame_lock:
 				if current_frame is not None:
@@ -700,21 +734,27 @@ def main():
 	# Initialize camera
 	initialize_camera(args.resolution, args.framerate)
 
-	# Start background capture thread
-	capture_thread = threading.Thread(target=capture_loop, daemon=True)
-	capture_thread.start()
-	logger.info("Camera capture thread started")
+	# Start MJPEG recording to streaming output
+	camera.start_recording(streaming_output, format='mjpeg', quality=JPEG_QUALITY)
+	logger.info(f"MJPEG recording started: quality={JPEG_QUALITY}")
+
+	# Start background monitoring thread for motion detection
+	monitoring_thread = threading.Thread(target=monitoring_loop, daemon=True)
+	monitoring_thread.start()
+	logger.info("Monitoring thread started")
 
 	# Start HTTP server
 	server_class = HTTPServer
 	httpd = server_class((HOST_NAME, PORT_NUMBER), SimpleCloudFileServer)
 
 	logger.info(f"Server started on {HOST_NAME}:{PORT_NUMBER}")
+	logger.info(f"MJPEG stream available at: http://{HOST_NAME}:{PORT_NUMBER}/stream")
 	try:
 		httpd.serve_forever()
 	except KeyboardInterrupt:
 		logger.info("Received shutdown signal")
 	finally:
+		camera.stop_recording()
 		camera.close()
 		httpd.server_close()
 		logger.info("Server stopped")
