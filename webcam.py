@@ -254,20 +254,34 @@ class MotionDetector:
 def capture_loop():
 	"""Continuously capture frames from camera to memory"""
 	global current_frame, motion_detector
+	frame_count = 0
+	last_perf_log = time.time()
+	total_capture_time = 0.0
+	total_motion_time = 0.0
+
 	while True:
 		try:
+			loop_start = time.time()
+
 			# Capture to in-memory buffer
+			capture_start = time.time()
 			stream = io.BytesIO()
 			camera.capture(stream, format='jpeg', use_video_port=True)
+			frame_bytes = stream.getvalue()
+			capture_time = time.time() - capture_start
+			total_capture_time += capture_time
 
 			# Thread-safe update of current frame
-			frame_bytes = stream.getvalue()
 			with frame_lock:
 				current_frame = frame_bytes
 
 			# Check for motion if enabled
+			motion_time = 0.0
 			if motion_detector is not None:
+				motion_start = time.time()
 				motion_detected, change_pct = motion_detector.check_motion(frame_bytes)
+				motion_time = time.time() - motion_start
+				total_motion_time += motion_time
 
 				# Log motion events
 				if motion_detected:
@@ -283,6 +297,18 @@ def capture_loop():
 					if status['state'] == MotionDetector.STATE_COOLDOWN and change_pct < motion_detector.threshold:
 						logger.debug(f"Motion ended. Change: {change_pct:.2f}%")
 
+			# Performance logging every 5 seconds
+			frame_count += 1
+			if time.time() - last_perf_log >= 5.0:
+				avg_capture = (total_capture_time / frame_count) * 1000
+				avg_motion = (total_motion_time / frame_count) * 1000 if motion_detector else 0
+				actual_fps = frame_count / (time.time() - last_perf_log)
+				logger.info(f"Performance: {actual_fps:.1f} FPS | Capture: {avg_capture:.1f}ms | Motion: {avg_motion:.1f}ms")
+				frame_count = 0
+				last_perf_log = time.time()
+				total_capture_time = 0.0
+				total_motion_time = 0.0
+
 			# No artificial delay - capture as fast as possible
 			# Client request rate naturally throttles effective FPS
 		except Exception as e:
@@ -290,6 +316,14 @@ def capture_loop():
 			time.sleep(1)
 
 class SimpleCloudFileServer(BaseHTTPRequestHandler):
+	def log_request(self, code='-', size='-'):
+		"""Override to control request logging based on log level"""
+		# Only log requests if DEBUG level is enabled, or if it's an error
+		if logger.isEnabledFor(logging.DEBUG):
+			BaseHTTPRequestHandler.log_request(self, code, size)
+		elif isinstance(code, int) and code >= 400:
+			BaseHTTPRequestHandler.log_request(self, code, size)
+
 	def sendHeader(self, response=200, contentType="image/jpeg"):
 		self.send_response(response)
 		self.send_header("Content-type", contentType)
