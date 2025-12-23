@@ -2,16 +2,15 @@
 Webcam streaming server for Raspberry Pi Camera (optimized for Pi Zero with NOIR camera).
 
 ## Features
-- Live camera stream via HTTP
-- Web interface with rotation controls (N/E/S/W)
-- Connection status indicator
-- Optional HTTP Basic Authentication
-- Health check endpoint for monitoring
-- CORS support for embedding in web apps
-- Motion detection with configurable threshold and cooldown
-- Automatic snapshot saving on motion events
-- Motion status API endpoints
-- Real-time motion indicator in web UI
+- **MJPEG streaming** - Hardware-accelerated 30 FPS video streaming
+- **Modern web interface** - Rotation controls, zoom, fullscreen, keyboard shortcuts
+- **HTTPS/SSL support** - Self-signed certificates for secure access
+- **Motion detection** - Configurable threshold and cooldown
+- **RAM-only snapshots** - Motion event snapshots stored in memory
+- **Optional authentication** - HTTP Basic Auth via environment variables
+- **API endpoints** - Health check, motion status, snapshot access
+- **CORS support** - Embed in web applications
+- **Systemd integration** - Auto-start on boot
 
 ## Quick Start
 
@@ -46,8 +45,16 @@ With HTTPS: `https://pi-noir-camera.local:8443/webcam.html`
 --port PORT            Port to bind to (default: 8000)
 --resolution WxH       Camera resolution (default: 640x480)
 --framerate FPS        Camera framerate (default: 30)
+--quality N            JPEG quality 1-100, lower=faster (default: 85)
 --no-auth              Disable authentication even if credentials set
 --log-level LEVEL      Logging level: DEBUG, INFO, WARNING, ERROR (default: INFO)
+```
+
+### SSL/HTTPS Options
+```
+--ssl                  Enable HTTPS with SSL certificate
+--cert PATH            Path to SSL certificate file (default: cert.pem)
+--key PATH             Path to SSL private key file (default: key.pem)
 ```
 
 ### Motion Detection Options
@@ -71,10 +78,48 @@ python3 webcam.py --log-level ERROR
 ## Endpoints
 
 - `/webcam.html` - Web interface with controls
-- `/webcam.jpg` - Current frame (JPEG)
-- `/health` - Server status including motion detection (JSON, no auth required)
+- `/stream` - **MJPEG video stream** (multipart/x-mixed-replace, ~30 FPS)
+- `/webcam.jpg` - Current frame snapshot (JPEG, legacy compatibility)
+- `/health` - Server status including motion detection and FPS (JSON, no auth required)
 - `/motion/status` - Detailed motion detection status (JSON)
 - `/motion/snapshot` - Latest motion snapshot image (JPEG)
+
+## Performance
+
+PiWebcam uses **MJPEG streaming** with the Pi camera's hardware encoder for optimal performance.
+
+### Streaming Performance
+
+- **~30 FPS** at 640x480 with default settings
+- Hardware-accelerated MJPEG encoding
+- Multi-threaded server handles multiple clients simultaneously
+- RAM-only operation (no SD card writes for snapshots)
+
+### Quality vs Speed
+
+The `--quality` parameter controls JPEG compression:
+
+```bash
+# Maximum quality (slower encoding, larger files)
+python3 webcam.py --quality 85
+
+# Balanced (recommended, default in service)
+python3 webcam.py --quality 50
+
+# Maximum speed (lower quality, smaller files)
+python3 webcam.py --quality 30
+```
+
+**Recommendations:**
+- **640x480 @ quality 50**: ~30 FPS, good balance
+- **320x240 @ quality 50**: Lower bandwidth, same FPS
+- **1280x720 @ quality 30**: Higher resolution, same FPS
+
+### Pi Zero Performance
+
+On Raspberry Pi Zero, the MJPEG streaming approach achieves significantly better performance than individual frame capture:
+- MJPEG streaming: ~30 FPS
+- Individual captures: ~8-10 FPS (old method)
 
 ## Motion Detection
 
